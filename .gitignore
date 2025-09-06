@@ -1,0 +1,12 @@
+# system
+.DS_Store
+
+# dependencies
+node_modules/
+package-lock.json
+
+# env
+.env
+api/.env
+frontend/.env
+
