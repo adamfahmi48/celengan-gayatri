@@ -1,4 +1,4 @@
-// server.js — versi PostgreSQL penuh (copy–paste)
+// api/server.js — PostgreSQL + CORS siap Vercel/localhost
 
 // 1) Imports & setup
 import dotenv from "dotenv";
@@ -11,12 +11,44 @@ import { pool, dbPing } from "./db.js";
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors({ origin: process.env.FRONTEND_URL || "*" }));
+// ---------- CORS (izinkan Vercel & localhost) ----------
+/*
+  Set di Render (Environment):
+  ALLOWED_ORIGINS = https://celengan-gayatri.vercel.app,https://celengan-gayatri-*.vercel.app,http://localhost:5173,http://localhost:5174,http://localhost:5175
+  (tambahkan domain preview Vercel jika perlu)
+*/
+const allowed = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || "")
+  .split(",")
+  .map(s => s.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin: (origin, cb) => {
+    // izinkan tools tanpa Origin (curl/postman)
+    if (!origin) return cb(null, true);
+    // bila tidak diset, izinkan semua (mode dev)
+    if (allowed.length === 0) return cb(null, true);
+    // dukung wildcard sederhana: "https://celengan-gayatri-*.vercel.app"
+    const ok = allowed.some(p => {
+      if (p.includes("*")) {
+        const re = new RegExp("^" + p.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*") + "$");
+        return re.test(origin);
+      }
+      return origin.startsWith(p);
+    });
+    if (ok) return cb(null, true);
+    return cb(new Error("Not allowed by CORS: " + origin));
+  },
+  credentials: false,
+};
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions)); // tangani preflight
+
+// Parser JSON
 app.use(express.json());
 
 // 2) Utilities
 async function getSystemAccounts(client) {
-  // Ambil ID akun KAS dan TABUNGAN_USER dari tabel accounts
   const { rows } = await client.query(
     `SELECT id, code FROM accounts WHERE code IN ('KAS','TABUNGAN_USER')`
   );
@@ -36,7 +68,8 @@ async function getUserBalance(userId) {
   return Number(rows[0]?.balance || 0);
 }
 
-// 3) Health checks
+// 3) Health & root
+app.get("/", (_req, res) => res.json({ ok: true, service: "celengan-gayatri-api" }));
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.get("/db/health", async (_req, res) => {
   try {
@@ -47,7 +80,7 @@ app.get("/db/health", async (_req, res) => {
   }
 });
 
-// 4) AUTH (DEMO: password disimpan plain — cocokkan dengan seed)
+// 4) AUTH (DEMO: password plain - cocok dengan seed)
 app.post("/auth/login", async (req, res) => {
   try {
     const { email, password } = req.body || {};
@@ -60,6 +93,7 @@ app.post("/auth/login", async (req, res) => {
        LIMIT 1`,
       [email, password]
     );
+
     const user = rows[0];
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
     res.json({ user });
@@ -74,13 +108,13 @@ app.post("/auth/register", async (req, res) => {
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ error: "Missing fields" });
     }
-    // Cek email sudah ada?
+
     const exists = await pool.query(`SELECT 1 FROM users WHERE email = $1`, [email]);
     if (exists.rowCount > 0) return res.status(409).json({ error: "Email exists" });
 
     const { rows } = await pool.query(
       `INSERT INTO users (name, email, phone, role, password_hash, is_active, created_at)
-       VALUES ($1,$2,$3,'user',$4,true, NOW())
+       VALUES ($1,$2,$3,'user',$4,true,NOW())
        RETURNING id, name, email, phone, role, is_active, created_at`,
       [name, email, phone, password]
     );
@@ -106,8 +140,14 @@ app.get("/users", async (_req, res) => {
 
 app.post("/users", async (req, res) => {
   try {
-    const { name, email, phone, role = "user", password_hash = "user123", is_active = true } =
-      req.body || {};
+    const {
+      name,
+      email,
+      phone,
+      role = "user",
+      password_hash = "user123",
+      is_active = true,
+    } = req.body || {};
     if (!name || !email || !phone) return res.status(400).json({ error: "Missing fields" });
 
     const { rows } = await pool.query(
@@ -125,7 +165,6 @@ app.post("/users", async (req, res) => {
 app.put("/users/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    // Bangun SET dinamis dari field yang dikirim
     const allowed = ["name", "email", "phone", "role", "password_hash", "is_active"];
     const keys = allowed.filter(k => k in req.body);
     if (keys.length === 0) return res.status(400).json({ error: "No fields to update" });
@@ -258,7 +297,7 @@ app.get("/ledger", async (_req, res) => {
   }
 });
 
-// 9) AI Proxy (tetap sama, pakai Gemini API Key)
+// 9) AI Proxy (Gemini)
 app.post("/ai/generate", async (req, res) => {
   try {
     const { prompt, systemInstruction } = req.body || {};
@@ -287,4 +326,3 @@ app.post("/ai/generate", async (req, res) => {
 
 // 10) Start
 app.listen(PORT, () => console.log(`API running on :${PORT}`));
-
