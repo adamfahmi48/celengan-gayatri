@@ -94,11 +94,30 @@ const Button = ({ children, onClick, className = "bg-amber-500 hover:bg-amber-60
   </button>
 );
 
-const Input = ({ label, type, value, onChange, placeholder, required = false }) => (
+const Input = ({
+  label,
+  type,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+  minLength,
+  maxLength,
+  pattern,
+  title,
+}) => (
   <div>
     <label className="block text-sm font-medium text-gray-700">{label}</label>
     <input
-      type={type} value={value} onChange={onChange} placeholder={placeholder} required={required}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      required={required}
+      minLength={minLength}
+      maxLength={maxLength}
+      pattern={pattern}
+      title={title} // pesan error bawaan browser
       className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm"
     />
   </div>
@@ -166,6 +185,10 @@ const LoginPage = ({ onLogin, onRegister }) => {
           setError("Semua field wajib diisi.");
           return;
         }
+        if (!/^[0-9]{10,13}$/.test(phone)) {
+          alert("Nomor handphone harus 10–13 digit angka");
+          return;
+        }
         await onRegister({ name, email, phone, password });
       } else {
         const ok = await onLogin(email, password);
@@ -192,10 +215,30 @@ const LoginPage = ({ onLogin, onRegister }) => {
             {isRegister && (
               <>
                 <Input label="Nama Lengkap" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama Anda" required />
-                <Input label="No. Handphone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="08123..." required />
+                <Input
+                  label="No. Handphone"
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="08123..."
+                  required
+                  minLength={10}
+                  maxLength={13}
+                  pattern="^[0-9]{10,13}$"
+                  title="Nomor handphone harus berupa 10–13 digit angka"
+                />
               </>
             )}
-            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anda@email.com" required />
+            <Input
+              label="Email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="anda@email.com"
+              required
+              pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+              title="Isi dengan format email yang sesuai, contoh: nama@email.com"
+            />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
             <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600">{isRegister ? "Daftar" : "Login"}</Button>
           </form>
@@ -205,7 +248,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
               {isRegister ? "Login di sini" : "Daftar di sini"}
             </button>
           </p>
-          <p className="text-xs text-center text-gray-400 mt-4">API: {API_BASE}</p>
+          {/* <p className="text-xs text-center text-gray-400 mt-4">API: {API_BASE}</p> */}
         </div>
       </div>
     </div>
