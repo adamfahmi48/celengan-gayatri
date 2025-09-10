@@ -22,9 +22,10 @@ const api = axios.create({
 const LogoIcon = () => (
   <div
     style={{
-      backgroundImage:
-        'url("https://samsattulungagung.com/wp-content/uploads/2024/07/gayatri-kecilldpi-1526x1536.png")',
-      backgroundSize: "contain", backgroundRepeat: "no-repeat", backgroundPosition: "center",
+      backgroundImage: 'url("/kotak senyum DWP.png")',
+      backgroundSize: "contain",
+      backgroundRepeat: "no-repeat",
+      backgroundPosition: "center",
     }}
     className="h-10 w-10"
     role="img"
@@ -204,7 +205,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
       <div className="w-full max-w-md">
         <div className="flex justify-center items-center mb-6 space-x-3">
           <LogoIcon />
-          <h1 className="text-3xl font-bold text-gray-800">Celengan DWP Gayatri</h1>
+          <h1 className="text-3xl font-bold text-gray-800">Kotak Senyum DWP</h1>
         </div>
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">
