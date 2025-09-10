@@ -58,6 +58,7 @@ const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heig
   strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-target"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>;
 const WhatsAppIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
   viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M16.75 13.96c.25.13.43.2.5.33.07.13.07.68-.16 1.32-.23.64-.75 1.16-1.29 1.38-.54.22-1.14.22-1.78.07-.64-.15-1.32-.33-2.68-1.04-1.36-.7-2.25-1.55-3.08-2.8-1.1-1.65-1.36-2.93-1.36-3.18 0-.25.13-.5.25-.64.13-.13.25-.13.38-.13h.38c.13 0 .25.07.38.38l.13.25c.13.25.25.5.38.75s.13.38.07.64c-.07.25-.07.38-.25.64l-.38.38c-.13.13-.07.38.07.64.13.25.38.64.75 1.14.75 1 1.39 1.29 1.64 1.39.25.13.38.07.64-.13l.38-.5c.25-.25.5-.38.75-.25l.88.5c.25.13.5.25.64.38.13.13.13.25.07.5zM12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18.13a8.13 8.13 0 1 1 8.13-8.13 8.14 8.14 0 0 1-8.13 8.13z"/></svg>;
+const SpinnerIcon = () => <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
 
 /* ===========================
    HELPERS
@@ -176,6 +177,7 @@ const LoginPage = ({ onLogin, onRegister }) => {
   const [phone, setPhone] = useState("");
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -192,8 +194,17 @@ const LoginPage = ({ onLogin, onRegister }) => {
         }
         await onRegister({ name, email, phone, password });
       } else {
-        const ok = await onLogin(email, password);
-        if (!ok) setError("Email atau password salah.");
+          setIsLoading(true);
+          try {
+            const success = await onLogin(email, password);
+              if (!success) {
+                  setError('Email atau password salah.');
+              }
+          } catch (error) {
+            setError('Login Gagal Silahkan Coba Lagi');
+          } finally {
+            setIsLoading(false); // Stop loading after attempt
+          }
       }
     } catch (err) {
       setError(err?.response?.data?.error || "Terjadi kesalahan.");
@@ -241,7 +252,20 @@ const LoginPage = ({ onLogin, onRegister }) => {
               title="Isi dengan format email yang sesuai, contoh: nama@email.com"
             />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600">{isRegister ? "Daftar" : "Login"}</Button>
+            <Button 
+                type="submit" 
+                className="w-full bg-amber-500 hover:bg-amber-600"
+                disabled={isLoading && !isRegister}
+            >
+                {isLoading && !isRegister ? (
+                    <>
+                        <SpinnerIcon />
+                        <span>Memproses...</span>
+                    </>
+                ) : (
+                    isRegister ? 'Daftar' : 'Login'
+                )}
+            </Button>
           </form>
           <p className="text-center text-sm text-gray-600 mt-6">
             {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}
@@ -271,7 +295,7 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
   const whatsAppUrl = useMemo(() => {
     if (!superadmin || !superadmin.phone) return "#";
     const phone = superadmin.phone.startsWith("0") ? "62" + superadmin.phone.substring(1) : superadmin.phone;
-    const message = encodeURIComponent(`Halo Bendahara, saya ${user.name} (ID: ${user.id}). `);
+    const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar Kotak Senyum DWP :) `);
     return `https://wa.me/${phone}?text=${message}`;
   }, [superadmin, user.name, user.id]);
 
@@ -363,6 +387,24 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
             </div>
           )}
         </div>
+      </div>
+
+      {/* Contact Admin Section */}
+      <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center gap-3 mb-2">
+              <WhatsAppIcon />
+              <h3 className="text-xl font-semibold text-gray-700">Hubungi Bendahara</h3>
+          </div>
+          <p className="text-gray-600 mb-4 text-sm">
+              Untuk melakukan setoran via transfer, konfirmasi data, atau jika ada pertanyaan lain, silakan hubungi Bendahara langsung melalui tombol WhatsApp di bawah.
+          </p>
+          <div className="flex flex-wrap items-center gap-4">
+              <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer">
+                  <Button className="bg-green-500 hover:bg-green-600 text-white">
+                      <WhatsAppIcon /> Hubungi via WhatsApp
+                  </Button>
+              </a>
+          </div>
       </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
@@ -546,11 +588,23 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userName, setUserName] = useState("");
 
   const activeUsers = users.filter(u => u.is_active && u.role === "user");
   const selectedUserBalance = useMemo(() => userId ? calculateBalance(parseInt(userId), transactions) : 0, [userId, transactions]);
 
-  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id); }, [activeUsers, userId]);
+  const openModal = () => {
+    setIsModalOpen(true);
+  };
+  const closeModal = () => { setIsModalOpen(false);};
+
+  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id);  
+    const selectedUser = activeUsers.find(u => u.id === parseInt(activeUsers[0].id));
+    if (selectedUser) {
+      setUserName(selectedUser.name);
+    }}, 
+  [activeUsers, userId]);
 
   const resetForm = () => { setAmount(""); setNote(""); setError(""); };
 
@@ -559,7 +613,11 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
     if (!userId || !amount || !date) { setError("Nasabah, jumlah, dan tanggal wajib diisi."); return; }
     const numericAmount = parseFloat(amount); if (numericAmount <= 0) { setError("Jumlah transaksi harus positif."); return; }
     if (activeTab === "withdrawal" && numericAmount > selectedUserBalance) { setError("Saldo nasabah tidak mencukupi untuk penarikan ini."); return; }
+    openModal();
+  };
 
+  const sendTransaction = async () => {
+    const numericAmount = parseFloat(amount); if (numericAmount <= 0) { setError("Jumlah transaksi harus positif."); return; }
     const payload = { user_id: parseInt(userId), amount: numericAmount, date: new Date(date).toISOString(), note };
     try {
       if (activeTab === "deposit") await onAddDeposit(payload); else await onAddWithdrawal(payload);
@@ -567,6 +625,9 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
       setSuccess(`${actionText} untuk ${users.find(u => u.id == userId)?.name} berhasil ditambahkan.`);
       resetForm(); setTimeout(() => setSuccess(""), 3000);
     } catch (err) { setError(err?.response?.data?.error || "Gagal menyimpan transaksi."); }
+    finally{
+      closeModal();
+    }
   };
 
   return (
@@ -585,9 +646,26 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
       {success && <p className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm">{success}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Select label="Pilih Nasabah" value={userId} onChange={(e) => setUserId(e.target.value)}>
-          {activeUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-        </Select>
+      <Select
+        label="Pilih Nasabah"
+        value={userId}
+        onChange={(e) => {
+          const id = e.target.value;
+          setUserId(id);          
+          
+          const selectedUser = activeUsers.find(u => u.id === parseInt(id));
+
+          if (selectedUser) {
+            setUserName(selectedUser.name);
+          }
+        }}
+      >
+        {activeUsers.map(u => (
+          <option key={u.id} value={u.id}>
+            {u.name}
+          </option>
+        ))}
+      </Select>
         {activeTab === "withdrawal" && userId && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
             Saldo tersedia: <span className="font-bold">{formatCurrency(selectedUserBalance)}</span>
@@ -600,6 +678,16 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
           <Button onClick={() => onSetPage("superuserDashboard")} className="bg-gray-300 hover:bg-gray-400 text-gray-800">Kembali</Button>
           <Button type="submit">Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</Button>
         </div>
+        <Modal isOpen={isModalOpen} onClose={closeModal} title={activeTab === "deposit" ? "Setoran" : "Penarikan"}>
+            <div className="space-y-4">
+              <h2 className="text-2xl font-bold text-gray-800 mb-6">Apakah anda yakin ingin melakukan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</h2>
+              <h3 className="text-2xl text-gray-800 mb-6">Pada Nasabah {userName} Sejumlah {amount}</h3>
+              <div className="flex justify-end space-x-2 pt-4">
+                <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Batal</Button>
+                <Button onClick={() => sendTransaction()}>Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</Button>
+              </div>
+            </div>
+        </Modal>
       </form>
     </div>
   );
