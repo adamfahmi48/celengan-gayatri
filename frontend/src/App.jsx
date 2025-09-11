@@ -29,7 +29,7 @@ const LogoIcon = () => (
     }}
     className="h-10 w-10"
     role="img"
-    aria-label="Celengan DWP Gayatri Logo"
+    aria-label="Kotak Senyum DWP Logo"
   />
 );
 const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -471,13 +471,27 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
   }, [users, transactions]);
   const activeUsers = useMemo(() => users.filter(u => u.is_active && u.role === "user").length, [users]);
   const monthlyDeposits = useMemo(() => {
-    const deposits = {};
-    transactions.forEach(t => {
-      const month = new Date(t.date).toLocaleString("id-ID", { month: "short", year: "numeric" });
-      if (!deposits[month]) deposits[month] = 0;
-      if (t.type === "deposit") deposits[month] += t.amount;
+  const buckets = new Map();
+  transactions.forEach((t) => {
+    const d = new Date(t.date);
+    if (Number.isNaN(d)) return;
+
+    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+    if (!buckets.has(ym)) buckets.set(ym, 0);
+    if (t.type === "deposit") buckets.set(ym, buckets.get(ym) + t.amount);
+  });
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([ym, total]) => {
+      const [year, month] = ym.split("-").map(Number);
+      const label = new Date(year, month - 1, 1).toLocaleDateString("id-ID", {
+        month: "short",
+        year: "numeric",
+      });
+      return { name: label, total };
     });
-    return Object.entries(deposits).map(([name, total]) => ({ name, total })).reverse();
   }, [transactions]);
   const recentTransactions = useMemo(() =>
     [...transactions].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
@@ -590,6 +604,7 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   const [success, setSuccess] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [userName, setUserName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const activeUsers = users.filter(u => u.is_active && u.role === "user");
   const selectedUserBalance = useMemo(() => userId ? calculateBalance(parseInt(userId), transactions) : 0, [userId, transactions]);
@@ -599,11 +614,7 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   };
   const closeModal = () => { setIsModalOpen(false);};
 
-  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id);  
-    const selectedUser = activeUsers.find(u => u.id === parseInt(activeUsers[0].id));
-    if (selectedUser) {
-      setUserName(selectedUser.name);
-    }}, 
+  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id);  }, 
   [activeUsers, userId]);
 
   const resetForm = () => { setAmount(""); setNote(""); setError(""); };
@@ -613,22 +624,53 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
     if (!userId || !amount || !date) { setError("Nasabah, jumlah, dan tanggal wajib diisi."); return; }
     const numericAmount = parseFloat(amount); if (numericAmount <= 0) { setError("Jumlah transaksi harus positif."); return; }
     if (activeTab === "withdrawal" && numericAmount > selectedUserBalance) { setError("Saldo nasabah tidak mencukupi untuk penarikan ini."); return; }
+    const nama = users.find(u => u.id == userId)?.name;
+    setUserName(nama);
     openModal();
   };
 
   const sendTransaction = async () => {
-    const numericAmount = parseFloat(amount); if (numericAmount <= 0) { setError("Jumlah transaksi harus positif."); return; }
-    const payload = { user_id: parseInt(userId), amount: numericAmount, date: new Date(date).toISOString(), note };
+    // guard: bila sudah proses, jangan kirim lagi
+    if (isSubmitting) return;
+
+    const numericAmount = parseFloat(amount);
+    if (numericAmount <= 0) {
+      setError("Jumlah transaksi harus positif.");
+      return;
+    }
+
+    setIsSubmitting(true); // mulai loading
+
+    const payload = {
+      user_id: parseInt(userId),
+      amount: numericAmount,
+      date: new Date(date).toISOString(),
+      note
+    };
+
     try {
-      if (activeTab === "deposit") await onAddDeposit(payload); else await onAddWithdrawal(payload);
+      if (activeTab === "deposit") {
+        await onAddDeposit(payload);
+      } else {
+        await onAddWithdrawal(payload);
+      }
+
+      const nama = users.find(u => u.id == userId)?.name;
       const actionText = activeTab === "deposit" ? "Setoran" : "Penarikan";
-      setSuccess(`${actionText} untuk ${users.find(u => u.id == userId)?.name} berhasil ditambahkan.`);
-      resetForm(); setTimeout(() => setSuccess(""), 3000);
-    } catch (err) { setError(err?.response?.data?.error || "Gagal menyimpan transaksi."); }
-    finally{
+
+      setSuccess(`${actionText} untuk ${nama} sebesar Rp${formatCurrency(numericAmount)} berhasil ditambahkan.`);
+      resetForm();
+      setTimeout(() => setSuccess(""), 3000);
+
+      // sukses → tutup modal
       closeModal();
+    } catch (err) {
+      setError(err?.response?.data?.error || "Gagal menyimpan transaksi.");
+    } finally {
+      setIsSubmitting(false); // selesai loading (baik sukses atau gagal)
     }
   };
+
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl mx-auto">
@@ -652,12 +694,6 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
         onChange={(e) => {
           const id = e.target.value;
           setUserId(id);          
-          
-          const selectedUser = activeUsers.find(u => u.id === parseInt(id));
-
-          if (selectedUser) {
-            setUserName(selectedUser.name);
-          }
         }}
       >
         {activeUsers.map(u => (
@@ -681,10 +717,18 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
         <Modal isOpen={isModalOpen} onClose={closeModal} title={activeTab === "deposit" ? "Setoran" : "Penarikan"}>
             <div className="space-y-4">
               <h2 className="text-2xl font-bold text-gray-800 mb-6">Apakah anda yakin ingin melakukan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</h2>
-              <h3 className="text-2xl text-gray-800 mb-6">Pada Nasabah {userName} Sejumlah {amount}</h3>
+              <h3 className="text-2xl text-gray-800 mb-6">Pada Nasabah {userName} Sejumlah {formatCurrency(amount)}</h3>
               <div className="flex justify-end space-x-2 pt-4">
-                <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Batal</Button>
-                <Button onClick={() => sendTransaction()}>Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</Button>
+                <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300" disabled={isSubmitting}>Batal</Button>
+                <Button onClick={sendTransaction} disabled={isSubmitting}>
+                  {isSubmitting ? (
+                    <>
+                      <SpinnerIcon /> Menyimpan...
+                    </>
+                  ) : (
+                    <>Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</>
+                  )}
+                </Button>
               </div>
             </div>
         </Modal>
@@ -998,7 +1042,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 md:h-20">
             <div className="flex items-center space-x-3">
               <LogoIcon />
-              <span className="text-xl font-bold text-gray-800">Celengan DWP Gayatri</span>
+              <span className="text-xl font-bold text-gray-800">Kotak Senyum DWP</span>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
