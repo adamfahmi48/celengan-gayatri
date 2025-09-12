@@ -6,6 +6,10 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
+// penyimpanan
+const STORAGE_USER = "kotaksenyum_user";
+const STORAGE_PAGE = "kotaksenyum_page";
+
 /* ===========================
    API CLIENT
 =========================== */
@@ -119,7 +123,7 @@ const Input = ({
       minLength={minLength}
       maxLength={maxLength}
       pattern={pattern}
-      title={title} // pesan error bawaan browser
+      title={title}
       className="mt-1 block w-full px-3 py-2 bg-white border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-amber-500 focus:border-amber-500 sm:text-sm"
     />
   </div>
@@ -194,17 +198,15 @@ const LoginPage = ({ onLogin, onRegister }) => {
         }
         await onRegister({ name, email, phone, password });
       } else {
-          setIsLoading(true);
-          try {
-            const success = await onLogin(email, password);
-              if (!success) {
-                  setError('Email atau password salah.');
-              }
-          } catch (error) {
-            setError('Login Gagal Silahkan Coba Lagi');
-          } finally {
-            setIsLoading(false); // Stop loading after attempt
-          }
+        setIsLoading(true);
+        try {
+          const success = await onLogin(email, password);
+          if (!success) setError("Email atau password salah.");
+        } catch {
+          setError("Login Gagal Silahkan Coba Lagi");
+        } finally {
+          setIsLoading(false);
+        }
       }
     } catch (err) {
       setError(err?.response?.data?.error || "Terjadi kesalahan.");
@@ -241,30 +243,10 @@ const LoginPage = ({ onLogin, onRegister }) => {
                 />
               </>
             )}
-            <Input
-              label="Email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="anda@email.com"
-              required
-              pattern="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-              title="Isi dengan format email yang sesuai, contoh: nama@email.com"
-            />
+            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anda@email.com" required />
             <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            <Button 
-                type="submit" 
-                className="w-full bg-amber-500 hover:bg-amber-600"
-                disabled={isLoading && !isRegister}
-            >
-                {isLoading && !isRegister ? (
-                    <>
-                        <SpinnerIcon />
-                        <span>Memproses...</span>
-                    </>
-                ) : (
-                    isRegister ? 'Daftar' : 'Login'
-                )}
+            <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600" disabled={isLoading && !isRegister}>
+              {isLoading && !isRegister ? (<><SpinnerIcon /><span>Memproses...</span></>) : (isRegister ? "Daftar" : "Login")}
             </Button>
           </form>
           <p className="text-center text-sm text-gray-600 mt-6">
@@ -273,7 +255,6 @@ const LoginPage = ({ onLogin, onRegister }) => {
               {isRegister ? "Login di sini" : "Daftar di sini"}
             </button>
           </p>
-          {/* <p className="text-xs text-center text-gray-400 mt-4">API: {API_BASE}</p> */}
         </div>
       </div>
     </div>
@@ -305,16 +286,36 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
   );
   const balance = useMemo(() => calculateBalance(user.id, transactions), [user.id, transactions]);
 
+  // --- pagination transaksi
+  const [pageTx, setPageTx] = useState(1);
+  const PAGE_SIZE = 10;
+  const totalPages = useMemo(() => Math.max(1, Math.ceil(userTransactions.length / PAGE_SIZE)), [userTransactions.length]);
+  const pagedUserTransactions = useMemo(() => {
+    const start = (pageTx - 1) * PAGE_SIZE;
+    return userTransactions.slice(start, start + PAGE_SIZE);
+  }, [userTransactions, pageTx]);
+  useEffect(() => { if (pageTx > totalPages) setPageTx(totalPages); }, [totalPages, pageTx]);
+
+  const goPrevTx  = () => setPageTx(p => Math.max(1, p - 1));
+  const goNextTx  = () => setPageTx(p => Math.min(totalPages, p + 1));
+  const goFirstTx = () => setPageTx(1);
+  const goLastTx  = () => setPageTx(totalPages);
+
   const chartData = useMemo(() => {
-    const dataMap = new Map();
+    const chronological = [...userTransactions].sort((a, b) => new Date(a.date) - new Date(b.date));
     let cumulative = 0;
-    const chronological = [...userTransactions].reverse();
+    const byDate = new Map();
     chronological.forEach(t => {
-      const date = new Date(t.date).toLocaleDateString("fr-CA");
+      const d = new Date(t.date);
+      if (Number.isNaN(d)) return;
+      const day = d.toISOString().slice(0, 10);
       cumulative += t.type === "deposit" ? t.amount : -t.amount;
-      dataMap.set(date, cumulative);
+      byDate.set(day, cumulative);
     });
-    return Array.from(dataMap.entries()).map(([d, bal]) => ({ date: formatDate(d).substring(3), balance: bal }));
+    const allDays = Array.from(byDate.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([iso, bal]) => ({ date: iso, balance: bal }));
+    return allDays.slice(-10);
   }, [userTransactions]);
 
   const handleExport = () => {
@@ -389,32 +390,26 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
         </div>
       </div>
 
-      {/* Contact Admin Section */}
-      <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center gap-3 mb-2">
-              <WhatsAppIcon />
-              <h3 className="text-xl font-semibold text-gray-700">Hubungi Bendahara</h3>
-          </div>
-          <p className="text-gray-600 mb-4 text-sm">
-              Untuk melakukan setoran via transfer, konfirmasi data, atau jika ada pertanyaan lain, silakan hubungi Bendahara langsung melalui tombol WhatsApp di bawah.
-          </p>
-          <div className="flex flex-wrap items-center gap-4">
-              <a href={whatsAppUrl} target="_blank" rel="noopener noreferrer">
-                  <Button className="bg-green-500 hover:bg-green-600 text-white">
-                      <WhatsAppIcon /> Hubungi via WhatsApp
-                  </Button>
-              </a>
-          </div>
-      </div>
-
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold text-gray-700 mb-4">Grafik Progres Tabungan</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis tickFormatter={(v) => `Rp${v/1000}k`} width={80} />
-            <Tooltip formatter={(v) => formatCurrency(v)} />
+            <XAxis
+              dataKey="date"
+              tickFormatter={(iso) =>
+                new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })
+              }
+            />
+            <YAxis tickFormatter={(v) => `Rp${v / 1000}k`} width={80} />
+            <Tooltip
+              formatter={(v) => formatCurrency(v)}
+              labelFormatter={(iso) =>
+                new Date(iso).toLocaleDateString("id-ID", {
+                  weekday: "long", day: "2-digit", month: "long", year: "numeric"
+                })
+              }
+            />
             <Legend />
             <Line type="monotone" dataKey="balance" name="Saldo" stroke="#f59e0b" strokeWidth={2} activeDot={{ r: 8 }} />
           </LineChart>
@@ -431,10 +426,14 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
         <div className="overflow-x-auto">
           <table className="w-full text-sm text-left text-gray-500">
             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-              <tr><th className="px-6 py-3">Tanggal</th><th className="px-6 py-3">Jumlah</th><th className="px-6 py-3 hidden sm:table-cell">Catatan</th></tr>
+              <tr>
+                <th className="px-6 py-3">Tanggal</th>
+                <th className="px-6 py-3">Jumlah</th>
+                <th className="px-6 py-3 hidden sm:table-cell">Catatan</th>
+              </tr>
             </thead>
             <tbody>
-              {userTransactions.map(t => (
+              {pagedUserTransactions.map((t) => (
                 <tr key={t.id} className="bg-white border-b hover:bg-gray-50">
                   <td className="px-6 py-4 font-medium text-gray-900">{formatDate(t.date)}</td>
                   <td className={`px-6 py-4 font-semibold ${t.type === "deposit" ? "text-green-600" : "text-red-600"}`}>
@@ -444,8 +443,33 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
                   <td className="px-6 py-4 hidden sm:table-cell">{t.note || "-"}</td>
                 </tr>
               ))}
+
+              {Array.from({ length: Math.max(0, PAGE_SIZE - pagedUserTransactions.length) }).map((_, i) => (
+                <tr key={`placeholder-${i}`} className="bg-transparent" aria-hidden="true">
+                  <td className="px-6 py-4">&nbsp;</td>
+                  <td className="px-6 py-4">&nbsp;</td>
+                  <td className="px-6 py-4 hidden sm:table-cell">&nbsp;</td>
+                </tr>
+              ))}
             </tbody>
           </table>
+
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+            <div className="text-sm text-gray-600">
+              {(() => {
+                const start = (pageTx - 1) * PAGE_SIZE + 1;
+                const end = Math.min(pageTx * PAGE_SIZE, userTransactions.length);
+                return `Menampilkan ${start}-${end} dari ${userTransactions.length} transaksi`;
+              })()}
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={goFirstTx} disabled={pageTx === 1} className={`px-3 py-1.5 rounded border text-sm ${pageTx === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>« Awal</button>
+              <button onClick={goPrevTx}  disabled={pageTx === 1} className={`px-3 py-1.5 rounded border text-sm ${pageTx === 1 ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>‹ Sebelumnya</button>
+              <span className="px-3 py-1.5 text-sm text-gray-700">Halaman <b>{pageTx}</b> / {totalPages}</span>
+              <button onClick={goNextTx}  disabled={pageTx === totalPages} className={`px-3 py-1.5 rounded border text-sm ${pageTx === totalPages ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>Berikutnya ›</button>
+              <button onClick={goLastTx}  disabled={pageTx === totalPages} className={`px-3 py-1.5 rounded border text-sm ${pageTx === totalPages ? "opacity-50 cursor-not-allowed" : "hover:bg-gray-50"}`}>Akhir »</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -470,33 +494,29 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
     return userBalances.reduce((s, b) => s + b, 0);
   }, [users, transactions]);
   const activeUsers = useMemo(() => users.filter(u => u.is_active && u.role === "user").length, [users]);
+
   const monthlyDeposits = useMemo(() => {
-  const buckets = new Map();
-  transactions.forEach((t) => {
-    const d = new Date(t.date);
-    if (Number.isNaN(d)) return;
-
-    const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-
-    if (!buckets.has(ym)) buckets.set(ym, 0);
-    if (t.type === "deposit") buckets.set(ym, buckets.get(ym) + t.amount);
-  });
-
-  return Array.from(buckets.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([ym, total]) => {
-      const [year, month] = ym.split("-").map(Number);
-      const label = new Date(year, month - 1, 1).toLocaleDateString("id-ID", {
-        month: "short",
-        year: "numeric",
-      });
-      return { name: label, total };
+    const buckets = new Map();
+    transactions.forEach((t) => {
+      const d = new Date(t.date);
+      if (Number.isNaN(d)) return;
+      const ym = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+      if (!buckets.has(ym)) buckets.set(ym, 0);
+      if (t.type === "deposit") buckets.set(ym, buckets.get(ym) + t.amount);
     });
+    return Array.from(buckets.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([ym, total]) => {
+        const [year, month] = ym.split("-").map(Number);
+        const label = new Date(year, month - 1, 1).toLocaleDateString("id-ID", { month: "short", year: "numeric" });
+        return { name: label, total };
+      });
   }, [transactions]);
-  const recentTransactions = useMemo(() =>
-    [...transactions].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
-                     .slice(0,5)
-                     .map(t => ({...t, user: users.find(u => u.id === t.user_id)})),
+
+  const recentTransactions = useMemo(
+    () => [...transactions].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
+      .slice(0,5)
+      .map(t => ({...t, user: users.find(u => u.id === t.user_id)})),
     [transactions, users]
   );
 
@@ -513,7 +533,9 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
   const handleGenerateAnnouncement = async () => {
     setIsGeneratingAnnouncement(true);
     const text = await onGenerateAnnouncement(
-      `Pengumuman singkat: total kas ${formatCurrency(totalKas)}, anggota aktif ${activeUsers}. Ajak semangat menabung. Gaya ramah.`
+      `Buat pengumuman singkat (maksimal 2 kalimat) untuk WhatsApp grup DWP UPT PPD Tulungagung.
+       Isi pengumuman: total saldo Kotak Senyum DWP ${formatCurrency(totalKas)}, jumlah anggota aktif ${activeUsers}.
+       Tulis dengan langsung mengajak semangat menabung.`
     );
     setAnnouncement(text || "");
     setIsGeneratingAnnouncement(false);
@@ -609,14 +631,10 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   const activeUsers = users.filter(u => u.is_active && u.role === "user");
   const selectedUserBalance = useMemo(() => userId ? calculateBalance(parseInt(userId), transactions) : 0, [userId, transactions]);
 
-  const openModal = () => {
-    setIsModalOpen(true);
-  };
-  const closeModal = () => { setIsModalOpen(false);};
+  const openModal = () => setIsModalOpen(true);
+  const closeModal = () => setIsModalOpen(false);
 
-  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id);  }, 
-  [activeUsers, userId]);
-
+  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id); }, [activeUsers, userId]);
   const resetForm = () => { setAmount(""); setNote(""); setError(""); };
 
   const handleSubmit = async (e) => {
@@ -630,47 +648,29 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   };
 
   const sendTransaction = async () => {
-    // guard: bila sudah proses, jangan kirim lagi
     if (isSubmitting) return;
-
     const numericAmount = parseFloat(amount);
-    if (numericAmount <= 0) {
-      setError("Jumlah transaksi harus positif.");
-      return;
-    }
+    if (numericAmount <= 0) { setError("Jumlah transaksi harus positif."); return; }
 
-    setIsSubmitting(true); // mulai loading
-
-    const payload = {
-      user_id: parseInt(userId),
-      amount: numericAmount,
-      date: new Date(date).toISOString(),
-      note
-    };
+    setIsSubmitting(true);
+    const payload = { user_id: parseInt(userId), amount: numericAmount, date: new Date(date).toISOString(), note };
 
     try {
-      if (activeTab === "deposit") {
-        await onAddDeposit(payload);
-      } else {
-        await onAddWithdrawal(payload);
-      }
+      if (activeTab === "deposit") await onAddDeposit(payload);
+      else await onAddWithdrawal(payload);
 
       const nama = users.find(u => u.id == userId)?.name;
       const actionText = activeTab === "deposit" ? "Setoran" : "Penarikan";
-
-      setSuccess(`${actionText} untuk ${nama} sebesar Rp${formatCurrency(numericAmount)} berhasil ditambahkan.`);
+      setSuccess(`${actionText} untuk ${nama} sebesar ${formatCurrency(numericAmount)} berhasil ditambahkan.`);
       resetForm();
       setTimeout(() => setSuccess(""), 3000);
-
-      // sukses → tutup modal
       closeModal();
     } catch (err) {
       setError(err?.response?.data?.error || "Gagal menyimpan transaksi.");
     } finally {
-      setIsSubmitting(false); // selesai loading (baik sukses atau gagal)
+      setIsSubmitting(false);
     }
   };
-
 
   return (
     <div className="bg-white p-8 rounded-lg shadow-md max-w-2xl mx-auto">
@@ -688,20 +688,9 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
       {success && <p className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm">{success}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-      <Select
-        label="Pilih Nasabah"
-        value={userId}
-        onChange={(e) => {
-          const id = e.target.value;
-          setUserId(id);          
-        }}
-      >
-        {activeUsers.map(u => (
-          <option key={u.id} value={u.id}>
-            {u.name}
-          </option>
-        ))}
-      </Select>
+        <Select label="Pilih Nasabah" value={userId} onChange={(e) => setUserId(e.target.value)}>
+          {activeUsers.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
+        </Select>
         {activeTab === "withdrawal" && userId && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
             Saldo tersedia: <span className="font-bold">{formatCurrency(selectedUserBalance)}</span>
@@ -714,23 +703,18 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
           <Button onClick={() => onSetPage("superuserDashboard")} className="bg-gray-300 hover:bg-gray-400 text-gray-800">Kembali</Button>
           <Button type="submit">Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</Button>
         </div>
+
         <Modal isOpen={isModalOpen} onClose={closeModal} title={activeTab === "deposit" ? "Setoran" : "Penarikan"}>
-            <div className="space-y-4">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Apakah anda yakin ingin melakukan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</h2>
-              <h3 className="text-2xl text-gray-800 mb-6">Pada Nasabah {userName} Sejumlah {formatCurrency(amount)}</h3>
-              <div className="flex justify-end space-x-2 pt-4">
-                <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300" disabled={isSubmitting}>Batal</Button>
-                <Button onClick={sendTransaction} disabled={isSubmitting}>
-                  {isSubmitting ? (
-                    <>
-                      <SpinnerIcon /> Menyimpan...
-                    </>
-                  ) : (
-                    <>Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</>
-                  )}
-                </Button>
-              </div>
+          <div className="space-y-4">
+            <h2 className="text-2xl font-bold text-gray-800 mb-6">Apakah anda yakin ingin melakukan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</h2>
+            <h3 className="text-2xl text-gray-800 mb-6">Pada Nasabah {userName} Sejumlah {formatCurrency(amount)}</h3>
+            <div className="flex justify-end space-x-2 pt-4">
+              <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300" disabled={isSubmitting}>Batal</Button>
+              <Button onClick={sendTransaction} disabled={isSubmitting}>
+                {isSubmitting ? (<><SpinnerIcon /> Menyimpan...</>) : (<>Simpan {activeTab === "deposit" ? "Setoran" : "Penarikan"}</>)}
+              </Button>
             </div>
+          </div>
         </Modal>
       </form>
     </div>
@@ -903,18 +887,20 @@ const LedgerPage = ({ ledgerEntries, transactions, users, accounts, onExport }) 
 };
 
 /* ===========================
-   MAIN APP (DATA & ROUTING)
+   MAIN APP
 =========================== */
 export default function App() {
+  // state
   const [currentUser, setCurrentUser] = useState(null);
-  const [page, setPage] = useState("login"); // login, userDashboard, superuserDashboard, transactionEntry, userManagement, ledger
+  const [page, setPage] = useState("login");
   const [users, setUsers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [ledgerEntries, setLedgerEntries] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [booting, setBooting] = useState(true);
 
-  // ---- API helpers
+  // API helpers (dideklarasikan SEBELUM effect)
   const fetchAll = async () => {
     setLoading(true);
     try {
@@ -930,43 +916,56 @@ export default function App() {
       const r = await api.post("/auth/login", { email, password });
       const user = r.data?.user;
       if (!user) return false;
+
       setCurrentUser(user);
+      const startPage = user.role === "superuser" ? "superuserDashboard" : "userDashboard";
+      setPage(startPage);
+
+      localStorage.setItem(STORAGE_USER, JSON.stringify(user));
+      localStorage.setItem(STORAGE_PAGE, startPage);
+
       await fetchAll();
-      setPage(user.role === "superuser" ? "superuserDashboard" : "userDashboard");
       return true;
-    } catch { return false; }
+    } catch {
+      return false;
+    }
   };
 
   const handleRegister = async ({ name, email, phone, password }) => {
     const r = await api.post("/auth/register", { name, email, phone, password });
     const user = r.data?.user;
+    if (!user) return;
+
     setCurrentUser(user);
+    const startPage = "userDashboard";
+    setPage(startPage);
+
+    localStorage.setItem(STORAGE_USER, JSON.stringify(user));
+    localStorage.setItem(STORAGE_PAGE, startPage);
+
     await fetchAll();
-    setPage("userDashboard");
   };
 
-  const handleLogout = () => { setCurrentUser(null); setPage("login"); };
+  const handleLogout = () => {
+    setCurrentUser(null);
+    setPage("login");
+    localStorage.removeItem(STORAGE_USER);
+    localStorage.removeItem(STORAGE_PAGE);
+  };
 
   // CRUD
   const addDeposit = async (payload) => {
     const r = await api.post("/transactions/deposit", payload);
-    // refresher data
     await fetchAll();
     return r.data;
   };
   const addWithdrawal = async (payload) => {
     const r = await api.post("/transactions/withdrawal", payload);
-    await fetchAll(); return r.data;
-  };
-  const updateUser = async (user) => {
-    await api.put(`/users/${user.id}`, user);
     await fetchAll();
+    return r.data;
   };
-  const createUser = async (user) => {
-    // back-end kamu menerima {name,email,phone,role,password_hash,is_active}
-    await api.post("/users", user);
-    await fetchAll();
-  };
+  const updateUser = async (user) => { await api.put(`/users/${user.id}`, user); await fetchAll(); };
+  const createUser = async (user) => { await api.post("/users", user); await fetchAll(); };
 
   // AI via backend proxy
   const aiGenerate = async (prompt, systemInstruction="") => {
@@ -984,8 +983,34 @@ export default function App() {
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
   };
 
-  if (!currentUser) return <LoginPage onLogin={handleLogin} onRegister={handleRegister} />;
+  /* ========= EFFECTS (semua sebelum return) ========= */
+  // load dari localStorage saat boot
+  useEffect(() => {
+    const savedUser = localStorage.getItem(STORAGE_USER);
+    const savedPage = localStorage.getItem(STORAGE_PAGE);
+    if (savedUser) {
+      setCurrentUser(JSON.parse(savedUser));
+      setPage(savedPage || "userDashboard");
+    }
+    setBooting(false);
+  }, []);
 
+  // simpan user ke localStorage saat berubah
+  useEffect(() => {
+    if (currentUser) localStorage.setItem(STORAGE_USER, JSON.stringify(currentUser));
+  }, [currentUser]);
+
+  // simpan halaman terakhir
+  useEffect(() => {
+    if (currentUser) localStorage.setItem(STORAGE_PAGE, page);
+  }, [page, currentUser]);
+
+  // setelah user ada (login / refresh) → tarik semua data
+  useEffect(() => {
+    if (currentUser) fetchAll();
+  }, [currentUser]);
+
+  // helper render
   const renderPage = () => {
     switch (page) {
       case "userDashboard":
@@ -1034,6 +1059,15 @@ export default function App() {
         return <div>Halaman tidak ditemukan.</div>;
     }
   };
+
+  /* ========= RETURN (setelah semua hook di atas) ========= */
+  if (booting) {
+    return <div className="flex items-center justify-center min-h-screen">Memuat...</div>;
+  }
+
+  if (!currentUser) {
+    return <LoginPage onLogin={handleLogin} onRegister={handleRegister} />;
+  }
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
