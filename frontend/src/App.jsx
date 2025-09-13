@@ -1,5 +1,5 @@
 // src/App.jsx
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import axios from "axios";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -183,35 +183,55 @@ const LoginPage = ({ onLogin, onRegister }) => {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    try {
-      if (isRegister) {
-        if (!name || !email || !password || !phone) {
-          setError("Semua field wajib diisi.");
-          return;
-        }
-        if (!/^[0-9]{10,13}$/.test(phone)) {
-          alert("Nomor handphone harus 10–13 digit angka");
-          return;
-        }
-        await onRegister({ name, email, phone, password });
-      } else {
-        setIsLoading(true);
-        try {
-          const success = await onLogin(email, password);
-          if (!success) setError("Email atau password salah.");
-        } catch {
-          setError("Login Gagal Silahkan Coba Lagi");
-        } finally {
-          setIsLoading(false);
-        }
+const handleSubmit = async (e) => {
+  e.preventDefault();
+  setError("");
+
+  try {
+    if (isRegister) {
+      if (!name || !email || !password || !phone) {
+        setError("Semua field wajib diisi.");
+        return;
       }
-    } catch (err) {
-      setError(err?.response?.data?.error || "Terjadi kesalahan.");
+      if (!/^[0-9]{10,13}$/.test(phone)) {
+        alert("Nomor handphone harus 10–13 digit angka");
+        return;
+      }
+      await onRegister({ name, email, phone, password });
+      return;
     }
-  };
+
+    // --- LOGIN ---
+    setIsLoading(true);
+    const res = await onLogin(email, password);
+
+    if (!res?.ok) {
+      switch (res?.reason) {
+        case "timeout":
+          setError("Waktu koneksi habis. Server lambat/bangun. Coba lagi.");
+          break;
+        case "network":
+          setError("Tidak bisa terhubung ke server. Periksa koneksi atau server sedang offline.");
+          break;
+        case "invalid":
+          setError(res?.message || "Email atau password salah.");
+          break;
+        case "server":
+        default:
+          setError(res?.message || "Terjadi kesalahan di server.");
+          break;
+      }
+      return;
+    }
+
+    // kalau login berhasil → App.jsx akan handle redirect
+  } catch {
+    setError("Terjadi kesalahan tak terduga.");
+  } finally {
+    setIsLoading(false);
+  }
+};
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
@@ -389,6 +409,46 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
           )}
         </div>
       </div>
+
+    {/* Contact Admin Section */}
+    <div className="bg-white p-6 rounded-lg shadow-md">
+      <div className="flex items-center gap-3 mb-2">
+        <WhatsAppIcon />
+        <h3 className="text-xl font-semibold text-gray-700">Hubungi Bendahara</h3>
+      </div>
+      <p className="text-gray-600 mb-4 text-sm">
+        Untuk setoran via transfer, konfirmasi data, atau pertanyaan lainnya, hubungi Bendahara lewat WhatsApp di bawah.
+      </p>
+
+      {(() => {
+        const superadmin = users.find(u => u.role === "superuser" && u.is_active);
+        const phoneRaw = superadmin?.phone?.replace(/\D/g, "") || "";
+        const phoneIntl = phoneRaw
+          ? (phoneRaw.startsWith("62") ? phoneRaw : phoneRaw.startsWith("0") ? "62" + phoneRaw.slice(1) : "62" + phoneRaw)
+          : "";
+        const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar Kotak Senyum DWP :)`);
+
+        const waUrl = phoneIntl ? `https://wa.me/${phoneIntl}?text=${message}` : null;
+
+        return (
+          <div className="flex flex-wrap items-center gap-4">
+            <a href={waUrl || "#"} target="_blank" rel="noopener noreferrer">
+              <Button
+                className={`bg-green-500 hover:bg-green-600 text-white ${!waUrl ? "opacity-50 cursor-not-allowed" : ""}`}
+                disabled={!waUrl}
+              >
+                <WhatsAppIcon /> Hubungi via WhatsApp
+              </Button>
+            </a>
+            {!waUrl && (
+              <p className="text-xs text-red-500">
+                Nomor WA bendahara belum diisi. Tambahkan nomor pada menu <b>Manajemen User</b> (user dengan role <b>superuser</b>).
+              </p>
+            )}
+          </div>
+        );
+      })()}
+    </div>
 
       <div className="bg-white p-6 rounded-lg shadow-md">
         <h3 className="text-xl font-semibold text-gray-700 mb-4">Grafik Progres Tabungan</h3>
@@ -824,6 +884,29 @@ const LedgerPage = ({ ledgerEntries, transactions, users, accounts, onExport }) 
       .sort((a,b) => new Date(b.transaction.date) - new Date(a.transaction.date));
   }, [ledgerEntries, transactions, users, accounts, filters]);
 
+  // --- Pagination Buku Besar ---
+  const [pageLg, setPageLg] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10); // bisa 10/20/50
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(enriched.length / rowsPerPage)),
+    [enriched.length, rowsPerPage]
+  );
+
+  const visibleRows = useMemo(() => {
+    const start = (pageLg - 1) * rowsPerPage;
+    return enriched.slice(start, start + rowsPerPage);
+  }, [enriched, pageLg, rowsPerPage]);
+
+  useEffect(() => {
+    if (pageLg > totalPages) setPageLg(totalPages);
+  }, [totalPages, pageLg]);
+
+  const goFirstLg = () => setPageLg(1);
+  const goPrevLg  = () => setPageLg(p => Math.max(1, p - 1));
+  const goNextLg  = () => setPageLg(p => Math.min(totalPages, p + 1));
+  const goLastLg  = () => setPageLg(totalPages);
+
   const handleExport = () => {
     const headers = ["Tanggal","Akun","Nasabah","Debit","Kredit","Catatan"];
     const data = enriched.map(e => ({
@@ -864,7 +947,7 @@ const LedgerPage = ({ ledgerEntries, transactions, users, accounts, onExport }) 
             <tr><th className="px-6 py-3">Tanggal</th><th className="px-6 py-3">Akun</th><th className="px-6 py-3 hidden md:table-cell">Keterangan</th><th className="px-6 py-3 text-right">Debit</th><th className="px-6 py-3 text-right">Kredit</th></tr>
           </thead>
           <tbody>
-            {enriched.map(e => {
+            {visibleRows.map(e => {
               const desc = e.transaction.type === "deposit" ? `Setoran dari ${e.user?.name}` : `Penarikan oleh ${e.user?.name}`;
               return (
                 <tr key={e.id} className="bg-white border-b hover:bg-gray-50">
@@ -881,6 +964,47 @@ const LedgerPage = ({ ledgerEntries, transactions, users, accounts, onExport }) 
             })}
           </tbody>
         </table>
+
+        {/* Pagination controls */}
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4">
+          <div className="text-sm text-gray-600">
+            {(() => {
+              if (enriched.length === 0) return "Tidak ada data";
+              const start = (pageLg - 1) * rowsPerPage + 1;
+              const end = Math.min(pageLg * rowsPerPage, enriched.length);
+              return `Menampilkan ${start}-${end} dari ${enriched.length} entri`;
+            })()}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-600">Baris/hal:</span>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(parseInt(e.target.value, 10));
+                setPageLg(1); // kembali ke halaman 1 tiap ganti ukuran
+              }}
+              className="px-2 py-1 border rounded text-sm"
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button onClick={goFirstLg} disabled={pageLg === 1} className="px-3 py-1.5 rounded border text-sm">« Awal</button>
+            <button onClick={goPrevLg} disabled={pageLg === 1} className="px-3 py-1.5 rounded border text-sm">‹ Sebelumnya</button>
+
+            <span className="px-3 py-1.5 text-sm text-gray-700">
+              Halaman <b>{pageLg}</b> / {totalPages}
+            </span>
+
+            <button onClick={goNextLg} disabled={pageLg === totalPages} className="px-3 py-1.5 rounded border text-sm">Berikutnya ›</button>
+            <button onClick={goLastLg} disabled={pageLg === totalPages} className="px-3 py-1.5 rounded border text-sm">Akhir »</button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -915,7 +1039,10 @@ export default function App() {
     try {
       const r = await api.post("/auth/login", { email, password });
       const user = r.data?.user;
-      if (!user) return false;
+
+      if (!user) {
+        return { ok: false, reason: "invalid" };
+      }
 
       setCurrentUser(user);
       const startPage = user.role === "superuser" ? "superuserDashboard" : "userDashboard";
@@ -925,11 +1052,22 @@ export default function App() {
       localStorage.setItem(STORAGE_PAGE, startPage);
 
       await fetchAll();
-      return true;
-    } catch {
-      return false;
+      return { ok: true };
+    } catch (err) {
+      if (err?.code === "ECONNABORTED") {
+        return { ok: false, reason: "timeout" };
+      }
+      if (!err?.response) {
+        return { ok: false, reason: "network" };
+      }
+      const serverMsg = err.response?.data?.error || "Terjadi kesalahan di server.";
+      if (/invalid|salah/i.test(serverMsg)) {
+        return { ok: false, reason: "invalid", message: serverMsg };
+      }
+      return { ok: false, reason: "server", message: serverMsg };
     }
   };
+
 
   const handleRegister = async ({ name, email, phone, password }) => {
     const r = await api.post("/auth/register", { name, email, phone, password });
@@ -952,6 +1090,38 @@ export default function App() {
     localStorage.removeItem(STORAGE_USER);
     localStorage.removeItem(STORAGE_PAGE);
   };
+
+    // --- AUTO LOGOUT KARENA TIDAK ADA AKTIVITAS ---
+  const timerRef = useRef(null);
+  const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
+
+  const scheduleLogout = () => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      alert("Anda otomatis keluar karena tidak ada aktivitas selama 5 menit.");
+      handleLogout();
+    }, INACTIVITY_MS);
+  };
+  
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const events = ["mousemove", "keydown", "click", "scroll", "touchstart", "visibilitychange"];
+    const onActivity = () => {
+      if (document.visibilityState === "hidden") return;
+      scheduleLogout();
+    };
+
+    scheduleLogout();
+    events.forEach((ev) => window.addEventListener(ev, onActivity, { passive: true }));
+
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      events.forEach((ev) => window.removeEventListener(ev, onActivity));
+    };
+  }, [currentUser, page]);
+
 
   // CRUD
   const addDeposit = async (payload) => {
