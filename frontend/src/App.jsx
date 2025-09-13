@@ -1093,15 +1093,27 @@ export default function App() {
 
     // --- AUTO LOGOUT KARENA TIDAK ADA AKTIVITAS ---
   const timerRef = useRef(null);
-  const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
+  // const INACTIVITY_MS = 5 * 60 * 1000; // 5 menit
+  const INACTIVITY_MS = 5 * 1000; // 5 menit
+
+  // const scheduleLogout = () => {
+  //   if (timerRef.current) clearTimeout(timerRef.current);
+  //   timerRef.current = setTimeout(() => {
+  //     alert("Anda otomatis keluar karena tidak ada aktivitas selama 5 menit.");
+  //     handleLogout();
+  //   }, INACTIVITY_MS);
+  // };
 
   const scheduleLogout = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
+    console.log("⏱ Pasang timer auto logout baru");
     timerRef.current = setTimeout(() => {
+      console.log("🚪 Auto logout triggered");
       alert("Anda otomatis keluar karena tidak ada aktivitas selama 5 menit.");
       handleLogout();
     }, INACTIVITY_MS);
   };
+
   
 
   useEffect(() => {
