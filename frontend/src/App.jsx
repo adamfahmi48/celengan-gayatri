@@ -6,6 +6,9 @@ import {
   Tooltip, Legend, ResponsiveContainer
 } from "recharts";
 
+import LandingPage from "./LandingPage.jsx";
+
+
 // penyimpanan
 const STORAGE_USER = "kotaksenyum_user";
 const STORAGE_PAGE = "kotaksenyum_page";
@@ -24,16 +27,12 @@ const api = axios.create({
    ICONS (inline)
 =========================== */
 const LogoIcon = () => (
-  <div
-    style={{
-      backgroundImage: 'url("/kotak senyum DWP.png")',
-      backgroundSize: "contain",
-      backgroundRepeat: "no-repeat",
-      backgroundPosition: "center",
-    }}
+  <img
+    src="/kotak senyum DWP.svg"   // pastikan nama sama dengan yang di public/
+    alt="KotakSenyum DWP"
     className="h-10 w-10"
-    role="img"
-    aria-label="Kotak Senyum DWP Logo"
+    loading="eager"
+    decoding="async"
   />
 );
 const UsersIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
@@ -174,7 +173,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 /* ===========================
    LOGIN PAGE
 =========================== */
-const LoginPage = ({ onLogin, onRegister }) => {
+const LoginPage = ({ onLogin, onRegister, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -208,7 +207,7 @@ const handleSubmit = async (e) => {
     if (!res?.ok) {
       switch (res?.reason) {
         case "timeout":
-          setError("Waktu koneksi habis. Server lambat/bangun. Coba lagi.");
+          setError("Waktu koneksi habis. Coba lagi.");
           break;
         case "network":
           setError("Tidak bisa terhubung ke server. Periksa koneksi atau server sedang offline.");
@@ -238,7 +237,7 @@ const handleSubmit = async (e) => {
       <div className="w-full max-w-md">
         <div className="flex justify-center items-center mb-6 space-x-3">
           <LogoIcon />
-          <h1 className="text-3xl font-bold text-gray-800">Kotak Senyum DWP</h1>
+          <h1 className="text-3xl font-bold text-gray-800">KotakSenyum DWP</h1>
         </div>
         <div className="bg-white p-8 rounded-lg shadow-lg">
           <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">
@@ -271,8 +270,20 @@ const handleSubmit = async (e) => {
           </form>
           <p className="text-center text-sm text-gray-600 mt-6">
             {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}
-            <button onClick={() => setIsRegister(!isRegister)} className="font-medium text-amber-600 hover:text-amber-500 ml-1">
+            <button
+              onClick={() => setIsRegister(!isRegister)}
+              className="font-medium text-amber-600 hover:text-amber-500 ml-1"
+            >
               {isRegister ? "Login di sini" : "Daftar di sini"}
+            </button>
+          </p>
+
+          <p className="text-center text-sm text-gray-500 mt-2">
+            <button
+              onClick={onBack}
+              className="hover:text-orange-500 hover:underline transition-colors duration-200"
+            >
+              « Kembali ke Beranda
             </button>
           </p>
         </div>
@@ -296,7 +307,7 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
   const whatsAppUrl = useMemo(() => {
     if (!superadmin || !superadmin.phone) return "#";
     const phone = superadmin.phone.startsWith("0") ? "62" + superadmin.phone.substring(1) : superadmin.phone;
-    const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar Kotak Senyum DWP :) `);
+    const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar KotakSenyum DWP :) `);
     return `https://wa.me/${phone}?text=${message}`;
   }, [superadmin, user.name, user.id]);
 
@@ -426,7 +437,7 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
         const phoneIntl = phoneRaw
           ? (phoneRaw.startsWith("62") ? phoneRaw : phoneRaw.startsWith("0") ? "62" + phoneRaw.slice(1) : "62" + phoneRaw)
           : "";
-        const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar Kotak Senyum DWP :)`);
+        const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar KotakSenyum DWP :)`);
 
         const waUrl = phoneIntl ? `https://wa.me/${phoneIntl}?text=${message}` : null;
 
@@ -594,7 +605,7 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
     setIsGeneratingAnnouncement(true);
     const text = await onGenerateAnnouncement(
       `Buat pengumuman singkat (maksimal 2 kalimat) untuk WhatsApp grup DWP UPT PPD Tulungagung.
-       Isi pengumuman: total saldo Kotak Senyum DWP ${formatCurrency(totalKas)}, jumlah anggota aktif ${activeUsers}.
+       Isi pengumuman: total saldo KotakSenyum DWP ${formatCurrency(totalKas)}, jumlah anggota aktif ${activeUsers}.
        Tulis dengan langsung mengajak semangat menabung.`
     );
     setAnnouncement(text || "");
@@ -1016,7 +1027,7 @@ const LedgerPage = ({ ledgerEntries, transactions, users, accounts, onExport }) 
 export default function App() {
   // state
   const [currentUser, setCurrentUser] = useState(null);
-  const [page, setPage] = useState("login");
+  const [page, setPage] = useState("landing");
   const [users, setUsers] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -1156,16 +1167,21 @@ export default function App() {
   };
 
   /* ========= EFFECTS (semua sebelum return) ========= */
-  // load dari localStorage saat boot
+// load dari localStorage saat boot
   useEffect(() => {
     const savedUser = localStorage.getItem(STORAGE_USER);
     const savedPage = localStorage.getItem(STORAGE_PAGE);
+
     if (savedUser) {
       setCurrentUser(JSON.parse(savedUser));
       setPage(savedPage || "userDashboard");
+    } else {
+      setPage("landing");   // kalau tidak ada user, fallback ke landing
     }
+
     setBooting(false);
   }, []);
+
 
   // simpan user ke localStorage saat berubah
   useEffect(() => {
@@ -1232,14 +1248,26 @@ export default function App() {
     }
   };
 
-  /* ========= RETURN (setelah semua hook di atas) ========= */
+  // ...di dalam App()
   if (booting) {
     return <div className="flex items-center justify-center min-h-screen">Memuat...</div>;
   }
 
   if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} onRegister={handleRegister} />;
+    // belum login
+    if (page === "landing") {
+      return <LandingPage onGetStarted={() => setPage("login")} />;
+    }
+    // sudah klik "Mulai Sekarang" / "Masuk", tampilkan Login
+    return (
+      <LoginPage
+        onLogin={handleLogin}
+        onRegister={handleRegister}
+        onBack={() => setPage("landing")}
+      />
+    );
   }
+
 
   return (
     <div className="bg-gray-100 min-h-screen font-sans">
@@ -1248,7 +1276,7 @@ export default function App() {
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 md:h-20">
             <div className="flex items-center space-x-3">
               <LogoIcon />
-              <span className="text-xl font-bold text-gray-800">Kotak Senyum DWP</span>
+              <span className="text-xl font-bold text-gray-800">KotakSenyum DWP</span>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
