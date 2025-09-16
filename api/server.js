@@ -81,42 +81,72 @@ app.get("/db/health", async (_req, res) => {
 });
 
 // 4) AUTH (DEMO: password plain - cocok dengan seed)
+// /api/server.js
 app.post("/auth/login", async (req, res) => {
   try {
-    const { email, password } = req.body || {};
-    if (!email || !password) return res.status(400).json({ error: "Missing email/password" });
+    // TERIMA KEDUANYA: identifier (baru) atau email (lama)
+    const { identifier, email, password } = req.body || {};
+    const idf = (identifier || email || "").trim();
+    if (!idf || !password) {
+      return res.status(400).json({ error: "Missing identifier/password" });
+    }
 
     const { rows } = await pool.query(
-      `SELECT id, name, email, phone, role, password_hash, is_active, created_at
+      `SELECT id, name, email, phone, username, role, password_hash, is_active, created_at
        FROM users
-       WHERE email = $1 AND password_hash = $2
+       WHERE (
+              lower(email) = lower($1)
+           OR lower(username) = lower($1)
+           OR regexp_replace(phone, '\\D', '', 'g') = regexp_replace($1, '\\D', '', 'g')
+       )
+       AND password_hash = $2
        LIMIT 1`,
-      [email, password]
+      [idf, password]
     );
 
     const user = rows[0];
     if (!user) return res.status(401).json({ error: "Invalid credentials" });
+
     res.json({ user });
   } catch (e) {
     res.status(500).json({ error: "Login failed", detail: String(e) });
   }
 });
 
+
+
 app.post("/auth/register", async (req, res) => {
   try {
-    const { name, email, phone, password } = req.body || {};
+    let { name, email, phone, username, password } = req.body || {};
     if (!name || !email || !phone || !password) {
       return res.status(400).json({ error: "Missing fields" });
     }
 
-    const exists = await pool.query(`SELECT 1 FROM users WHERE email = $1`, [email]);
-    if (exists.rowCount > 0) return res.status(409).json({ error: "Email exists" });
+    // jika username kosong → auto dari email/name/phone
+    const fallbackFromEmail = (email || "").split("@")[0];
+    const fallbackFromName  = (name || "").toLowerCase().replace(/\s+/g, "");
+    const fallbackFromPhone = (phone || "").replace(/\D/g, "");
+    username = (username || fallbackFromEmail || fallbackFromName || fallbackFromPhone || "")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, "")        // huruf/angka/underscore saja
+      .slice(0, 20);                      // batasi panjang wajar
+
+    if (!username || username.length < 3) {
+      return res.status(400).json({ error: "Username minimal 3 karakter (a-z, 0-9, _)" });
+    }
+
+    // cek unik email & username
+    const dupEmail = await pool.query(`SELECT 1 FROM users WHERE lower(email)=lower($1)`, [email]);
+    if (dupEmail.rowCount > 0) return res.status(409).json({ error: "Email exists" });
+
+    const dupUser = await pool.query(`SELECT 1 FROM users WHERE lower(username)=lower($1)`, [username]);
+    if (dupUser.rowCount > 0) return res.status(409).json({ error: "Username exists" });
 
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, phone, role, password_hash, is_active, created_at)
-       VALUES ($1,$2,$3,'user',$4,true,NOW())
-       RETURNING id, name, email, phone, role, is_active, created_at`,
-      [name, email, phone, password]
+      `INSERT INTO users (name, email, phone, username, role, password_hash, is_active, created_at)
+       VALUES ($1,$2,$3,$4,'user',$5,true,NOW())
+       RETURNING id, name, email, phone, username, role, is_active, created_at`,
+      [name, email, phone, username, password]
     );
     res.json({ user: rows[0] });
   } catch (e) {
@@ -124,11 +154,12 @@ app.post("/auth/register", async (req, res) => {
   }
 });
 
+
 // 5) USERS
 app.get("/users", async (_req, res) => {
   try {
     const { rows } = await pool.query(
-      `SELECT id, name, email, phone, role, is_active, created_at
+      `SELECT id, name, email, phone, username, role, is_active, created_at
        FROM users
        ORDER BY id`
     );
@@ -138,23 +169,35 @@ app.get("/users", async (_req, res) => {
   }
 });
 
+
 app.post("/users", async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      phone,
+    let {
+      name, email, phone, username,
       role = "user",
       password_hash = "user123",
       is_active = true,
     } = req.body || {};
+
     if (!name || !email || !phone) return res.status(400).json({ error: "Missing fields" });
 
+    // auto & sanitasi username bila kosong
+    const fallbackFromEmail = (email || "").split("@")[0];
+    username = (username || fallbackFromEmail || name || phone)
+      .toString().toLowerCase().replace(/\s+/g, "").replace(/[^a-z0-9_]/g, "").slice(0, 20);
+
+    // cek unik email & username
+    const dupEmail = await pool.query(`SELECT 1 FROM users WHERE lower(email)=lower($1)`, [email]);
+    if (dupEmail.rowCount > 0) return res.status(409).json({ error: "Email exists" });
+
+    const dupUser = await pool.query(`SELECT 1 FROM users WHERE lower(username)=lower($1)`, [username]);
+    if (dupUser.rowCount > 0) return res.status(409).json({ error: "Username exists" });
+
     const { rows } = await pool.query(
-      `INSERT INTO users (name, email, phone, role, password_hash, is_active, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,NOW())
-       RETURNING id, name, email, phone, role, is_active, created_at`,
-      [name, email, phone, role, password_hash, is_active]
+      `INSERT INTO users (name, email, phone, username, role, password_hash, is_active, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,NOW())
+       RETURNING id, name, email, phone, username, role, is_active, created_at`,
+      [name, email, phone, username, role, password_hash, is_active]
     );
     res.json(rows[0]);
   } catch (e) {
@@ -162,19 +205,33 @@ app.post("/users", async (req, res) => {
   }
 });
 
+
 app.put("/users/:id", async (req, res) => {
   try {
     const id = Number(req.params.id);
-    const allowed = ["name", "email", "phone", "role", "password_hash", "is_active"];
+    const allowed = ["name", "email", "phone", "username", "role", "password_hash", "is_active"];
     const keys = allowed.filter(k => k in req.body);
     if (keys.length === 0) return res.status(400).json({ error: "No fields to update" });
+
+    // jika update email/username → cek unik
+    if (keys.includes("email")) {
+      const dup = await pool.query(`SELECT 1 FROM users WHERE lower(email)=lower($1) AND id<>$2`, [req.body.email, id]);
+      if (dup.rowCount > 0) return res.status(409).json({ error: "Email exists" });
+    }
+    if (keys.includes("username")) {
+      const uname = (req.body.username || "").toLowerCase().replace(/[^a-z0-9_]/g, "");
+      req.body.username = uname;
+      if (uname.length < 3) return res.status(400).json({ error: "Username minimal 3 karakter" });
+      const dup = await pool.query(`SELECT 1 FROM users WHERE lower(username)=lower($1) AND id<>$2`, [uname, id]);
+      if (dup.rowCount > 0) return res.status(409).json({ error: "Username exists" });
+    }
 
     const sets = keys.map((k, i) => `${k} = $${i + 2}`).join(", ");
     const values = keys.map(k => req.body[k]);
 
     const { rows } = await pool.query(
       `UPDATE users SET ${sets} WHERE id = $1
-       RETURNING id, name, email, phone, role, is_active, created_at`,
+       RETURNING id, name, email, phone, username, role, is_active, created_at`,
       [id, ...values]
     );
     if (rows.length === 0) return res.status(404).json({ error: "Not found" });
@@ -183,6 +240,7 @@ app.put("/users/:id", async (req, res) => {
     res.status(500).json({ error: "Update user failed", detail: String(e) });
   }
 });
+
 
 // 6) ACCOUNTS
 app.get("/accounts", async (_req, res) => {

@@ -35,7 +35,7 @@ export default function LandingPage({ onGetStarted }) {
         onClick={onGetStarted}
         className="bg-orange-500 hover:bg-orange-600 text-white text-sm sm:text-base"
         >
-        Masuk / Daftar
+        Masuk
         </Button>
     </div>
     </header>
@@ -64,7 +64,7 @@ export default function LandingPage({ onGetStarted }) {
         </h1>
 
         <p className="mt-6 max-w-2xl mx-auto text-base sm:text-lg text-orange-50">
-        Pencatatan tabungan digital yang mudah dan aman, kini didukung oleh
+        Pencatatan tabungan digital yang mudah dan aman, didukung oleh
         <span className="font-semibold underline"> Asisten AI</span> untuk
         perencanaan keuangan cerdas.
         </p>
@@ -157,7 +157,7 @@ export default function LandingPage({ onGetStarted }) {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* kartu 1 */}
         <div className="flex items-start gap-4 p-6 rounded-lg shadow-md hover:shadow-xl hover:-translate-y-1 transition-all bg-gradient-to-br from-orange-100 to-orange-200 text-gray-800">
-            <div className="flex-shrink-0 h-12 w-12 bg-orange-300/50 text-orange-700 rounded-full flex items-center justify-center text-xl">🔓</div>
+            <div className="flex-shrink-0 h-12 w-12 bg-orange-300/50 text-orange-700 rounded-full flex items-center justify-center text-xl">📱</div>
             <div>
             <h4 className="font-bold text-orange-800">Kemudahan Akses</h4>
             <p className="text-sm mt-1">Anggota dapat melihat saldo & riwayat kapan saja.</p>

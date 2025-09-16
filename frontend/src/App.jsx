@@ -62,6 +62,26 @@ const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" heig
 const WhatsAppIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
   viewBox="0 0 24 24" fill="currentColor" className="w-6 h-6"><path d="M16.75 13.96c.25.13.43.2.5.33.07.13.07.68-.16 1.32-.23.64-.75 1.16-1.29 1.38-.54.22-1.14.22-1.78.07-.64-.15-1.32-.33-2.68-1.04-1.36-.7-2.25-1.55-3.08-2.8-1.1-1.65-1.36-2.93-1.36-3.18 0-.25.13-.5.25-.64.13-.13.25-.13.38-.13h.38c.13 0 .25.07.38.38l.13.25c.13.25.25.5.38.75s.13.38.07.64c-.07.25-.07.38-.25.64l-.38.38c-.13.13-.07.38.07.64.13.25.38.64.75 1.14.75 1 1.39 1.29 1.64 1.39.25.13.38.07.64-.13l.38-.5c.25-.25.5-.38.75-.25l.88.5c.25.13.5.25.64.38.13.13.13.25.07.5zM12 2a10 10 0 1 0 10 10 10 10 0 0 0-10-10zm0 18.13a8.13 8.13 0 1 1 8.13-8.13 8.14 8.14 0 0 1-8.13 8.13z"/></svg>;
 const SpinnerIcon = () => <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>;
+const UserCheckIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user-check">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="m16 11 2 2 4-4"/>
+  </svg>
+);
+
+const UserXIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16"
+    viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+    strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-user-x">
+    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+    <circle cx="9" cy="7" r="4"/>
+    <path d="m17 8 5 5M22 8l-5 5"/>
+  </svg>
+);
+
 
 /* ===========================
    HELPERS
@@ -171,66 +191,40 @@ const Modal = ({ isOpen, onClose, title, children }) => {
 };
 
 /* ===========================
-   LOGIN PAGE
+   LOGIN PAGE (tanpa register)
 =========================== */
-const LoginPage = ({ onLogin, onRegister, onBack }) => {
-  const [email, setEmail] = useState("");
+const LoginPage = ({ onLogin, onBack }) => {
+  const [identifier, setIdentifier] = useState(""); // email/username/HP
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setError("");
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
 
-  try {
-    if (isRegister) {
-      if (!name || !email || !password || !phone) {
-        setError("Semua field wajib diisi.");
-        return;
-      }
-      if (!/^[0-9]{10,13}$/.test(phone)) {
-        alert("Nomor handphone harus 10–13 digit angka");
-        return;
-      }
-      await onRegister({ name, email, phone, password });
+    if (!identifier || !password) {
+      setError("Email/Username/No. HP dan Password wajib diisi.");
       return;
     }
 
-    // --- LOGIN ---
-    setIsLoading(true);
-    const res = await onLogin(email, password);
-
-    if (!res?.ok) {
-      switch (res?.reason) {
-        case "timeout":
-          setError("Waktu koneksi habis. Coba lagi.");
-          break;
-        case "network":
-          setError("Tidak bisa terhubung ke server. Periksa koneksi atau server sedang offline.");
-          break;
-        case "invalid":
-          setError(res?.message || "Email atau password salah.");
-          break;
-        case "server":
-        default:
-          setError(res?.message || "Terjadi kesalahan di server.");
-          break;
+    try {
+      setIsLoading(true);
+      const res = await onLogin(identifier, password);
+      if (!res?.ok) {
+        switch (res?.reason) {
+          case "timeout": setError("Waktu koneksi habis. Coba lagi."); break;
+          case "network": setError("Tidak bisa terhubung ke server."); break;
+          case "invalid": setError(res?.message || "Kredensial salah."); break;
+          default: setError(res?.message || "Terjadi kesalahan di server."); break;
+        }
       }
-      return;
+    } catch {
+      setError("Terjadi kesalahan tak terduga.");
+    } finally {
+      setIsLoading(false);
     }
-
-    // kalau login berhasil → App.jsx akan handle redirect
-  } catch {
-    setError("Terjadi kesalahan tak terduga.");
-  } finally {
-    setIsLoading(false);
-  }
-};
-
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
@@ -239,50 +233,40 @@ const handleSubmit = async (e) => {
           <LogoIcon />
           <h1 className="text-3xl font-bold text-gray-800">KotakSenyum DWP</h1>
         </div>
+
         <div className="bg-white p-8 rounded-lg shadow-lg">
-          <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">
-            {isRegister ? "Registrasi Akun Baru" : "Login"}
-          </h2>
+          {/* <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login</h2> */}
+
           {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
+
           <form onSubmit={handleSubmit} className="space-y-6">
-            {isRegister && (
-              <>
-                <Input label="Nama Lengkap" type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="Nama Anda" required />
-                <Input
-                  label="No. Handphone"
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="08123..."
-                  required
-                  minLength={10}
-                  maxLength={13}
-                  pattern="^[0-9]{10,13}$"
-                  title="Nomor handphone harus berupa 10–13 digit angka"
-                />
-              </>
-            )}
-            <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="anda@email.com" required />
-            <Input label="Password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="••••••••" required />
-            <Button type="submit" className="w-full bg-amber-500 hover:bg-amber-600" disabled={isLoading && !isRegister}>
-              {isLoading && !isRegister ? (<><SpinnerIcon /><span>Memproses...</span></>) : (isRegister ? "Daftar" : "Login")}
+            <Input
+              label="Email / Username / No. HP"
+              type="text"
+              value={identifier}
+              onChange={(e) => setIdentifier(e.target.value)}
+              placeholder="Email / Username / No. HP"
+              required
+            />
+            <Input
+              label="Password"
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              required
+            />
+            <Button
+              type="submit"
+              className="w-full bg-amber-500 hover:bg-amber-600"
+              disabled={isLoading}
+            >
+              {isLoading ? (<><SpinnerIcon /><span>Memproses...</span></>) : "Login"}
             </Button>
           </form>
-          <p className="text-center text-sm text-gray-600 mt-6">
-            {isRegister ? "Sudah punya akun?" : "Belum punya akun?"}
-            <button
-              onClick={() => setIsRegister(!isRegister)}
-              className="font-medium text-amber-600 hover:text-amber-500 ml-1"
-            >
-              {isRegister ? "Login di sini" : "Daftar di sini"}
-            </button>
-          </p>
 
-          <p className="text-center text-sm text-gray-500 mt-2">
-            <button
-              onClick={onBack}
-              className="hover:text-orange-500 hover:underline transition-colors duration-200"
-            >
+          <p className="text-center text-sm text-gray-500 mt-4">
+            <button onClick={onBack} className="hover:text-orange-500 hover:underline transition-colors duration-200">
               « Kembali ke Beranda
             </button>
           </p>
@@ -291,6 +275,8 @@ const handleSubmit = async (e) => {
     </div>
   );
 };
+
+
 
 /* ===========================
    USER DASHBOARD (ringkas)
@@ -451,11 +437,7 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
                 <WhatsAppIcon /> Hubungi via WhatsApp
               </Button>
             </a>
-            {!waUrl && (
-              <p className="text-xs text-red-500">
-                Nomor WA bendahara belum diisi. Tambahkan nomor pada menu <b>Manajemen User</b> (user dengan role <b>superuser</b>).
-              </p>
-            )}
+
           </div>
         );
       })()}
@@ -684,6 +666,100 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
   );
 };
 
+// === SEARCHABLE SELECT (drop + pencarian di dalam) ===
+const SearchableSelect = ({ label, items, value, onChange, placeholder = "Cari nasabah..." }) => {
+  const [open, setOpen] = React.useState(false);
+  const [query, setQuery] = React.useState("");
+  const [highlight, setHighlight] = React.useState(0);
+  const containerRef = React.useRef(null);
+  const inputRef = React.useRef(null);
+
+const normalize = (s) =>
+  s.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+const filtered = React.useMemo(() => {
+  const q = normalize(query.trim());
+  if (!q) return items;
+
+  return items.filter((it) => {
+    const n = normalize(it.name);
+    // cocok di awal seluruh nama: "aman" cocok "Aman"
+    if (n.startsWith(q)) return true;
+    // cocok di awal kata manapun: "san" cocok "Budi Santoso"
+    return n.split(/\s+/).some((w) => w.startsWith(q));
+  });
+}, [items, query]);
+
+
+  const selected = items.find(it => String(it.id) === String(value));
+
+  React.useEffect(() => {
+    const onClickOutside = (e) => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
+
+  const choose = (it) => {
+    onChange(String(it.id));
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative" ref={containerRef}>
+      {label && <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="mt-1 w-full flex justify-between items-center rounded-md border border-gray-300 bg-white px-3 py-2 text-left shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+      >
+        <span className={selected ? "text-gray-900" : "text-gray-400"}>
+          {selected ? selected.name : "Pilih nasabah"}
+        </span>
+        <svg className="h-4 w-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
+          <path fillRule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.08 1.04l-4.25 4.25a.75.75 0 01-1.06 0L5.21 8.27a.75.75 0 01.02-1.06z" clipRule="evenodd" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 mt-1 w-full rounded-md border border-gray-200 bg-white shadow-lg">
+          <div className="p-2 border-b">
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={placeholder}
+              className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+            />
+          </div>
+          <ul className="max-h-56 overflow-auto py-1 text-sm">
+            {filtered.length === 0 && (
+              <li className="px-3 py-2 text-gray-500">Tidak ditemukan</li>
+            )}
+            {filtered.map((it) => (
+              <li
+                key={it.id}
+                onClick={() => choose(it)}
+                className={`cursor-pointer px-3 py-2 hover:bg-amber-50 ${
+                  String(it.id) === String(value) ? "font-semibold text-amber-700" : "text-gray-700"
+                }`}
+              >
+                {it.name}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
 /* ===========================
    TRANSACTION ENTRY
 =========================== */
@@ -699,13 +775,14 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
   const [userName, setUserName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const activeUsers = users.filter(u => u.is_active && u.role === "user");
+  const activeUsers = users
+    .filter(u => u.is_active && u.role === "user")
+    .sort((a, b) => a.name.localeCompare(b.name, "id", { sensitivity: "base" }));
   const selectedUserBalance = useMemo(() => userId ? calculateBalance(parseInt(userId), transactions) : 0, [userId, transactions]);
 
   const openModal = () => setIsModalOpen(true);
   const closeModal = () => setIsModalOpen(false);
 
-  useEffect(() => { if (activeUsers.length > 0 && !userId) setUserId(activeUsers[0].id); }, [activeUsers, userId]);
   const resetForm = () => { setAmount(""); setNote(""); setError(""); };
 
   const handleSubmit = async (e) => {
@@ -759,9 +836,12 @@ const TransactionEntryPage = ({ users, transactions, onAddDeposit, onAddWithdraw
       {success && <p className="bg-green-100 text-green-700 p-3 rounded-md mb-4 text-sm">{success}</p>}
 
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Select label="Pilih Nasabah" value={userId} onChange={(e) => setUserId(e.target.value)}>
-          {activeUsers.map(u => (<option key={u.id} value={u.id}>{u.name}</option>))}
-        </Select>
+        <SearchableSelect
+          label="Pilih Nasabah"
+          items={activeUsers.map(u => ({ id: u.id, name: u.name }))}
+          value={userId}
+          onChange={(val) => setUserId(val)}
+        />
         {activeTab === "withdrawal" && userId && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-md text-sm">
             Saldo tersedia: <span className="font-bold">{formatCurrency(selectedUserBalance)}</span>
@@ -800,10 +880,24 @@ const UserManagementPage = ({ users, onUpdateUser, onCreateUser }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isCreating, setIsCreating] = useState(false);
 
-  const openModal = (user) => {
-    setCurrentUser(user ? { ...user } : { name: "", email: "", phone: "", role: "user", password_hash: "", is_active: true });
-    setIsCreating(!user); setIsModalOpen(true);
-  };
+const openModal = (user) => {
+  setCurrentUser(
+    user
+      ? { ...user }
+      : {
+          name: "",
+          email: "",
+          phone: "",
+          username: "",      // <— TAMBAH
+          role: "user",
+          password_hash: "",
+          is_active: true,
+        }
+  );
+  setIsCreating(!user);
+  setIsModalOpen(true);
+};
+
   const closeModal = () => { setIsModalOpen(false); setCurrentUser(null); };
 
   const handleSave = async () => { if (isCreating) await onCreateUser(currentUser); else await onUpdateUser(currentUser); closeModal(); };
@@ -819,50 +913,163 @@ const UserManagementPage = ({ users, onUpdateUser, onCreateUser }) => {
       <div className="overflow-x-auto">
         <table className="w-full text-sm text-left text-gray-500">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-            <tr><th className="px-6 py-3">Nama</th><th className="px-6 py-3 hidden sm:table-cell">Email / Telepon</th><th className="px-6 py-3 hidden md:table-cell">Peran</th><th className="px-6 py-3">Status</th><th className="px-6 py-3">Aksi</th></tr>
+            <tr>
+              <th className="px-6 py-3">Nama</th>
+              <th className="px-6 py-3 hidden sm:table-cell">Email / Telepon</th>
+              <th className="px-6 py-3 hidden md:table-cell">Username</th>   {/* <— BARU */}
+              <th className="px-6 py-3 hidden md:table-cell">Peran</th>
+              <th className="px-6 py-3">Status</th>
+              <th className="px-6 py-3">Aksi</th>
+            </tr>
           </thead>
-          <tbody>
-            {users.map(u => (
-              <tr key={u.id} className="bg-white border-b hover:bg-gray-50">
-                <td className="px-6 py-4 font-medium text-gray-900">{u.name}<div className="font-normal text-gray-500 sm:hidden">{u.email}</div></td>
-                <td className="px-6 py-4 hidden sm:table-cell">{u.email}<br/><span className="text-xs text-gray-400">{u.phone}</span></td>
-                <td className="px-6 py-4 hidden md:table-cell">{u.role}</td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${u.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-                    {u.is_active ? "Aktif" : "Non-Aktif"}
-                  </span>
-                </td>
-                <td className="px-6 py-4 flex items-center space-x-2">
-                  <button onClick={() => openModal(u)} className="text-blue-600 hover:text-blue-800"><EditIcon/></button>
-                  <button onClick={() => toggleActiveStatus(u)} className="text-red-600 hover:text-red-800"><TrashIcon/></button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
+
+        <tbody>
+          {users.map(u => (
+            <tr key={u.id} className="bg-white border-b hover:bg-gray-50">
+              <td className="px-6 py-4 font-medium text-gray-900">
+                {u.name}
+                <div className="font-normal text-gray-500 sm:hidden">{u.email}</div>
+              </td>
+
+              <td className="px-6 py-4 hidden sm:table-cell">
+                {u.email}
+                <br />
+                <span className="text-xs text-gray-400">{u.phone}</span>
+              </td>
+
+              {/* USERNAME — BARU */}
+              <td className="px-6 py-4 hidden md:table-cell">
+                <span className="text-gray-800">{u.username}</span>
+              </td>
+
+              <td className="px-6 py-4 hidden md:table-cell">{u.role}</td>
+
+              <td className="px-6 py-4">
+                <span
+                  className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                    u.is_active ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"
+                  }`}
+                >
+                  {u.is_active ? "Aktif" : "Non-Aktif"}
+                </span>
+              </td>
+
+              <td className="px-6 py-4 flex items-center space-x-2">
+                <button
+                  onClick={() => openModal(u)}
+                  className="text-blue-600 hover:text-blue-800"
+                  title="Edit pengguna"
+                  aria-label="Edit pengguna"
+                >
+                  <EditIcon />
+                </button>
+
+                {u.is_active ? (
+                  // sedang AKTIF → tampilkan tombol untuk menonaktifkan (ikon merah)
+                  <button
+                    onClick={() => toggleActiveStatus(u)}
+                    className="text-red-600 hover:text-red-800"
+                    title="Nonaktifkan pengguna"
+                    aria-label="Nonaktifkan pengguna"
+                  >
+                    <UserXIcon />
+                  </button>
+                ) : (
+                  // sedang NON-AKTIF → tampilkan tombol untuk mengaktifkan (ikon hijau)
+                  <button
+                    onClick={() => toggleActiveStatus(u)}
+                    className="text-green-600 hover:text-green-800"
+                    title="Aktifkan pengguna"
+                    aria-label="Aktifkan pengguna"
+                  >
+                    <UserCheckIcon />
+                  </button>
+                )}
+              </td>
+
+            </tr>
+          ))}
+        </tbody>
         </table>
       </div>
 
-      <Modal isOpen={isModalOpen} onClose={closeModal} title={isCreating ? "Tambah Pengguna Baru" : "Edit Pengguna"}>
-        {currentUser && (
-          <div className="space-y-4">
-            <Input label="Nama Lengkap" type="text" value={currentUser.name} onChange={e => handleFieldChange("name", e.target.value)} />
-            <Input label="Email" type="email" value={currentUser.email} onChange={e => handleFieldChange("email", e.target.value)} />
-            <Input label="No. Telepon" type="text" value={currentUser.phone} onChange={e => handleFieldChange("phone", e.target.value)} />
-            {isCreating && <Input label="Password Awal" type="text" value={currentUser.password_hash} onChange={e => handleFieldChange("password_hash", e.target.value)} placeholder="Password sementara" />}
-            <Select label="Peran" value={currentUser.role} onChange={e => handleFieldChange("role", e.target.value)}>
-              <option value="user">User</option><option value="superuser">Superuser</option>
-            </Select>
-            <div className="flex items-center">
-              <input type="checkbox" id="is_active" checked={currentUser.is_active} onChange={e => handleFieldChange("is_active", e.target.checked)} className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded" />
-              <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">Aktif</label>
-            </div>
-            <div className="flex justify-end space-x-2 pt-4">
-              <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Batal</Button>
-              <Button onClick={handleSave}>{isCreating ? "Buat Pengguna" : "Simpan Perubahan"}</Button>
-            </div>
-          </div>
-        )}
-      </Modal>
+<Modal isOpen={isModalOpen} onClose={closeModal} title={isCreating ? "Tambah Pengguna Baru" : "Edit Pengguna"}>
+  {currentUser && (
+    <div className="space-y-4">
+      <Input
+        label="Nama Lengkap"
+        type="text"
+        value={currentUser.name}
+        onChange={e => handleFieldChange("name", e.target.value)}
+      />
+
+      <Input
+        label="Email"
+        type="email"
+        value={currentUser.email}
+        onChange={e => handleFieldChange("email", e.target.value)}
+      />
+
+      <Input
+        label="No. Telepon"
+        type="text"
+        value={currentUser.phone}
+        onChange={e => handleFieldChange("phone", e.target.value)}
+      />
+
+      {/* >>> Tambahkan ini <<< */}
+      <Input
+        label="Username"
+        type="text"
+        value={currentUser.username || ""}
+        onChange={e => handleFieldChange("username", e.target.value)}
+        placeholder="hanya huruf kecil, angka, underscore"
+        required
+        pattern="^[a-z0-9_]{3,20}$"
+        title="3–20 karakter: huruf kecil (a–z), angka (0–9), atau underscore (_)"
+      />
+      {/* >>> sampai sini <<< */}
+
+      {isCreating && (
+        <Input
+          label="Password Awal"
+          type="text"
+          value={currentUser.password_hash}
+          onChange={e => handleFieldChange("password_hash", e.target.value)}
+          placeholder="Password sementara"
+        />
+      )}
+
+      <Select
+        label="Peran"
+        value={currentUser.role}
+        onChange={e => handleFieldChange("role", e.target.value)}
+      >
+        <option value="user">User</option>
+        <option value="superuser">Superuser</option>
+      </Select>
+
+      <div className="flex items-center">
+        <input
+          type="checkbox"
+          id="is_active"
+          checked={currentUser.is_active}
+          onChange={e => handleFieldChange("is_active", e.target.checked)}
+          className="h-4 w-4 text-amber-600 focus:ring-amber-500 border-gray-300 rounded"
+        />
+        <label htmlFor="is_active" className="ml-2 block text-sm text-gray-900">
+          Aktif
+        </label>
+      </div>
+
+      <div className="flex justify-end space-x-2 pt-4">
+        <Button onClick={closeModal} className="bg-gray-200 text-gray-800 hover:bg-gray-300">Batal</Button>
+        <Button onClick={handleSave}>{isCreating ? "Buat Pengguna" : "Simpan Perubahan"}</Button>
+      </div>
+    </div>
+  )}
+</Modal>
+
     </div>
   );
 };
@@ -1046,54 +1253,35 @@ export default function App() {
     } finally { setLoading(false); }
   };
 
-  const handleLogin = async (email, password) => {
-    try {
-      const r = await api.post("/auth/login", { email, password });
-      const user = r.data?.user;
-
-      if (!user) {
-        return { ok: false, reason: "invalid" };
-      }
-
-      setCurrentUser(user);
-      const startPage = user.role === "superuser" ? "superuserDashboard" : "userDashboard";
-      setPage(startPage);
-
-      localStorage.setItem(STORAGE_USER, JSON.stringify(user));
-      localStorage.setItem(STORAGE_PAGE, startPage);
-
-      await fetchAll();
-      return { ok: true };
-    } catch (err) {
-      if (err?.code === "ECONNABORTED") {
-        return { ok: false, reason: "timeout" };
-      }
-      if (!err?.response) {
-        return { ok: false, reason: "network" };
-      }
-      const serverMsg = err.response?.data?.error || "Terjadi kesalahan di server.";
-      if (/invalid|salah/i.test(serverMsg)) {
-        return { ok: false, reason: "invalid", message: serverMsg };
-      }
-      return { ok: false, reason: "server", message: serverMsg };
-    }
-  };
-
-
-  const handleRegister = async ({ name, email, phone, password }) => {
-    const r = await api.post("/auth/register", { name, email, phone, password });
+const handleLogin = async (identifier, password) => {
+  try {
+    // backend sekarang menerima { identifier, password }
+    const r = await api.post("/auth/login", { identifier, password });
     const user = r.data?.user;
-    if (!user) return;
+
+    if (!user) {
+      return { ok: false, reason: "invalid" };
+    }
 
     setCurrentUser(user);
-    const startPage = "userDashboard";
+    const startPage = user.role === "superuser" ? "superuserDashboard" : "userDashboard";
     setPage(startPage);
 
     localStorage.setItem(STORAGE_USER, JSON.stringify(user));
     localStorage.setItem(STORAGE_PAGE, startPage);
 
     await fetchAll();
-  };
+    return { ok: true };
+  } catch (err) {
+    if (err?.code === "ECONNABORTED") return { ok: false, reason: "timeout" };
+    if (!err?.response) return { ok: false, reason: "network" };
+    const serverMsg = err.response?.data?.error || "Terjadi kesalahan di server.";
+    if (/invalid|salah/i.test(serverMsg)) {
+      return { ok: false, reason: "invalid", message: serverMsg };
+    }
+    return { ok: false, reason: "server", message: serverMsg };
+  }
+};
 
   const handleLogout = () => {
     setCurrentUser(null);
@@ -1260,11 +1448,10 @@ export default function App() {
     }
     // sudah klik "Mulai Sekarang" / "Masuk", tampilkan Login
     return (
-      <LoginPage
-        onLogin={handleLogin}
-        onRegister={handleRegister}
-        onBack={() => setPage("landing")}
-      />
+    <LoginPage
+      onLogin={handleLogin}
+      onBack={() => setPage("landing")}
+    />
     );
   }
 
