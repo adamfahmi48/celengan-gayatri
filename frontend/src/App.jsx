@@ -1,6 +1,7 @@
 // src/App.jsx
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import axios from "axios";
+import ReactMarkdown from "react-markdown";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer
@@ -96,6 +97,12 @@ const calculateBalance = (userId, allTransactions) =>
   allTransactions.filter(t => t.user_id === userId)
                  .reduce((acc, t) => acc + (t.type === "deposit" ? t.amount : -t.amount), 0);
 
+const cleanAi = (t) =>
+  (t || "")
+    .trim()
+    .replace(/^["'`]+|["'`]+$/g, ""); // buang kutip berlebih
+
+
 /* ===========================
    REUSABLE UI
 =========================== */
@@ -190,6 +197,7 @@ const Modal = ({ isOpen, onClose, title, children }) => {
   );
 };
 
+
 /* ===========================
    LOGIN PAGE (tanpa register)
 =========================== */
@@ -227,14 +235,18 @@ const LoginPage = ({ onLogin, onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center items-center p-4">
+    <div className="relative min-h-screen flex flex-col justify-center items-center p-4 font-sans bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50 overflow-hidden">
+          {/* lingkaran dekorasi */}
+    <div className="pointer-events-none absolute -top-24 -left-24 w-[340px] h-[340px] bg-orange-200/50 rounded-full blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-28 -right-24 w-[380px] h-[380px] bg-rose-200/50 rounded-full blur-3xl" />
+    <div className="pointer-events-none absolute top-24 right-20 w-[180px] h-[180px] bg-amber-100/60 rounded-full blur-2xl" />
       <div className="w-full max-w-md">
         <div className="flex justify-center items-center mb-6 space-x-3">
           <LogoIcon />
           <h1 className="text-3xl font-bold text-gray-800">KotakSenyum DWP</h1>
         </div>
 
-        <div className="bg-white p-8 rounded-lg shadow-lg">
+        <div className="relative z-10 bg-white/90 backdrop-blur-md p-8 rounded-xl shadow-lg">
           {/* <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login</h2> */}
 
           {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
@@ -277,33 +289,55 @@ const LoginPage = ({ onLogin, onBack }) => {
 };
 
 
-
 /* ===========================
-   USER DASHBOARD (ringkas)
+   USER DASHBOARD (1 box, 2 mode)
 =========================== */
+const MarkdownBlock = ({ text, className = "" }) => {
+  if (!text) return null;
+  return (
+    <div className={`rounded-lg p-4 leading-7 ${className}`}>
+      <ReactMarkdown
+        components={{
+          p: (props) => <p className="mb-2" {...props} />,
+          ul: (props) => <ul className="list-disc pl-6 mb-2" {...props} />,
+          ol: (props) => <ol className="list-decimal pl-6 mb-2" {...props} />,
+          li: (props) => <li className="mb-1" {...props} />,
+          strong: (props) => <strong className="font-semibold" {...props} />,
+          em: (props) => <em className="italic" {...props} />,
+          h1: (props) => <h3 className="text-lg font-semibold mb-2" {...props} />,
+          h2: (props) => <h4 className="text-base font-semibold mb-2" {...props} />,
+          h3: (props) => <h5 className="text-base font-semibold mb-2" {...props} />,
+        }}
+      >
+        {text.trim()}
+      </ReactMarkdown>
+    </div>
+  );
+};
+
+const cleanAiText = (s = "") => {
+  // kecilin kebablasan **bold**, heading, tanda kutip panjang, dsb — ringan saja
+  return s
+    .replace(/^#+\s*/gm, "")             // # heading -> plain
+    .replace(/—/g, "-")                  // em dash -> hyphen
+    .trim();
+};
+
+const enhanceBullets = (md = "") =>
+  md.replace(/^[-*]\s+([^:\n]{2,60}):\s*/gm, (_m, t) => `- **${t}**: `);
+
+
+
 const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onGeneratePlan }) => {
-  const [savingsTip, setSavingsTip] = useState("");
-  const [isGeneratingTip, setIsGeneratingTip] = useState(false);
-  const [goal, setGoal] = useState("");
-  const [goalAmount, setGoalAmount] = useState("");
-  const [savingsPlan, setSavingsPlan] = useState("");
-  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
-
+  // ====== data dasar
   const superadmin = useMemo(() => users.find(u => u.role === "superuser"), [users]);
-  const whatsAppUrl = useMemo(() => {
-    if (!superadmin || !superadmin.phone) return "#";
-    const phone = superadmin.phone.startsWith("0") ? "62" + superadmin.phone.substring(1) : superadmin.phone;
-    const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar KotakSenyum DWP :) `);
-    return `https://wa.me/${phone}?text=${message}`;
-  }, [superadmin, user.name, user.id]);
-
   const userTransactions = useMemo(
     () => transactions.filter(t => t.user_id === user.id).sort((a,b) => new Date(b.date) - new Date(a.date)),
     [transactions, user.id]
   );
   const balance = useMemo(() => calculateBalance(user.id, transactions), [user.id, transactions]);
 
-  // --- pagination transaksi
+  // ====== pagination transaksi (tidak diubah)
   const [pageTx, setPageTx] = useState(1);
   const PAGE_SIZE = 10;
   const totalPages = useMemo(() => Math.max(1, Math.ceil(userTransactions.length / PAGE_SIZE)), [userTransactions.length]);
@@ -312,12 +346,12 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
     return userTransactions.slice(start, start + PAGE_SIZE);
   }, [userTransactions, pageTx]);
   useEffect(() => { if (pageTx > totalPages) setPageTx(totalPages); }, [totalPages, pageTx]);
-
   const goPrevTx  = () => setPageTx(p => Math.max(1, p - 1));
   const goNextTx  = () => setPageTx(p => Math.min(totalPages, p + 1));
   const goFirstTx = () => setPageTx(1);
   const goLastTx  = () => setPageTx(totalPages);
 
+  // ====== grafik saldo (tidak diubah)
   const chartData = useMemo(() => {
     const chronological = [...userTransactions].sort((a, b) => new Date(a.date) - new Date(b.date));
     let cumulative = 0;
@@ -329,12 +363,59 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
       cumulative += t.type === "deposit" ? t.amount : -t.amount;
       byDate.set(day, cumulative);
     });
-    const allDays = Array.from(byDate.entries())
+    return Array.from(byDate.entries())
       .sort((a, b) => a[0].localeCompare(b[0]))
-      .map(([iso, bal]) => ({ date: iso, balance: bal }));
-    return allDays.slice(-10);
+      .map(([iso, bal]) => ({ date: iso, balance: bal }))
+      .slice(-10);
   }, [userTransactions]);
 
+  // ====== MODE: 'plan' atau 'tips'
+  const [mode, setMode] = useState("tips"); // 'plan' | 'tips'
+
+  // ====== state input + hasil
+  const [goal, setGoal] = useState("");
+  const [goalAmount, setGoalAmount] = useState("");
+  const [result, setResult] = useState(""); // hasil gabungan (plan atau tips)
+  const [loading, setLoading] = useState(false);
+
+  // setiap kali mode berubah, kosongkan hasil; kalau ke "tips", bersihkan input plan
+  useEffect(() => {
+    setResult("");           // reset area hasil
+    if (mode === "tips") {   // opsional: saat ke tips, kosongkan input plan
+      setGoal("");
+      setGoalAmount("");
+    }
+  }, [mode]);
+
+  // ====== aksi
+  const runGenerate = async () => {
+    try {
+      setLoading(true);
+      let text = "";
+    if (mode === "plan") {
+      if (!goal || !goalAmount) return;
+      text = await onGeneratePlan(
+        `Rencana menabung: tujuan "${goal}", target Rp${goalAmount}. Saldo ${formatCurrency(balance)}.
+        Buat 3–5 poin yang ringkas, praktis, dan membumi. Gunakan heading sederhana seperti "Langkah Utama", "Estimasi Target Bulanan".`,
+        "Anda perencana keuangan yang ramah, to-the-point, dan memotivasi.",
+        "plan"            // ⬅️ tambahkan ini
+      );
+    } else {
+      text = await onGenerateTip(
+        `Buat 5–7 tips menabung singkat, kreatif, dan bisa langsung dipraktikkan untuk ${user.name}.
+        Sertakan 1 kalimat motivasi penutup. Saldo saat ini ${formatCurrency(balance)}.
+        Format rapi dengan bullet bila cocok.`,
+        "Anda asisten keuangan yang suportif dan positif.",
+        "tips"            // ⬅️ tambahkan ini
+      );
+    }
+      setResult(cleanAiText(text || ""));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ====== ekspor CSV transaksi
   const handleExport = () => {
     const headers = ["Tanggal", "Tipe", "Jumlah", "Metode", "Catatan"];
     const data = userTransactions.map(t => ({
@@ -343,125 +424,152 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
     onExport(headers, data, `riwayat_transaksi_${user.name.replace(/ /g, "_")}.csv`);
   };
 
-  const handleGenerateTip = async () => {
-    setIsGeneratingTip(true);
-    const text = await onGenerateTip(
-      `Tips menabung singkat, kreatif, memotivasi untuk ${user.name}. Saldo ${formatCurrency(balance)}.`,
-      "Anda asisten keuangan yang suportif."
-    );
-    setSavingsTip(text || "");
-    setIsGeneratingTip(false);
-  };
-
-  const handleGeneratePlan = async () => {
-    if (!goal || !goalAmount) return;
-    setIsGeneratingPlan(true);
-    const text = await onGeneratePlan(
-      `Rencana menabung: tujuan "${goal}", target Rp${goalAmount}. Saldo ${formatCurrency(balance)}. Buat 3-4 poin realistis.`,
-      "Anda perencana keuangan yang memotivasi."
-    );
-    setSavingsPlan(text || "");
-    setIsGeneratingPlan(false);
-  };
-
+  // ====== UI
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h2 className="text-3xl font-bold text-gray-800">Dashboard Anda</h2>
-        <div className="bg-white p-4 rounded-lg shadow-md text-right w-full sm:w-auto">
-          <p className="text-md text-gray-500">Saldo Saat Ini</p>
-          <p className="text-3xl font-bold text-amber-600">{formatCurrency(balance)}</p>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow-md">
-          <div className="flex items-center gap-3 mb-4">
-            <TargetIcon className="w-8 h-8 text-amber-500" />
-            <h3 className="text-xl font-semibold text-gray-700">🎯 Rencana Tabungan</h3>
+      {/* SATU KOTAK: Plan / Tips */}
+      <div className="bg-white rounded-xl shadow-md border border-gray-100">
+        {/* header */}
+        <div className="px-6 pt-6">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          {/* Kiri: ikon + judul */}
+          <div className="flex items-center gap-3">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-amber-100">
+              <TargetIcon />
+            </span>
+            <div>
+              <h2 className="text-xl font-bold text-gray-800">Asisten Menabung</h2>
+              <p className="text-sm text-gray-500">Siap mendampingi perjalanan menabungmu.</p>
+            </div>
           </div>
-          <div className="space-y-4">
-            <Input label="Apa impianmu?" value={goal} onChange={e => setGoal(e.target.value)} placeholder="Contoh: Liburan ke Bali" />
-            <FormattedCurrencyInput label="Target Tabungan (Rp)" value={goalAmount} onChange={setGoalAmount} placeholder="Contoh: 5.000.000" />
-            <Button onClick={handleGeneratePlan} disabled={isGeneratingPlan || !goal || !goalAmount} className="w-full bg-green-600 hover:bg-green-700">
-              <SparklesIcon /> {isGeneratingPlan ? "Membuat Rencana..." : "Buatkan Saya Rencana!"}
+
+          {/* Kanan: saldo */}
+          <div className="shrink-0">
+            <div className="rounded-xl px-4 py-3 bg-amber-50 border border-amber-200 shadow-sm sm:text-right">
+              <p className="text-xs text-amber-700/80">Saldo Saat Ini</p>
+              <p className="text-2xl sm:text-3xl font-extrabold text-amber-700">
+                {formatCurrency(balance)}
+              </p>
+            </div>
+          </div>
+        </div>
+
+
+          {/* segmented control */}
+          <div className="mt-4 inline-flex rounded-lg border p-1 bg-gray-50">
+            <button
+              onClick={() => setMode("tips")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+                mode === "tips" ? "bg-white shadow border text-amber-700" : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              💡 Tips Harian
+            </button>
+            <button
+              onClick={() => setMode("plan")}
+              className={`px-4 py-2 text-sm font-medium rounded-md transition ${
+                mode === "plan" ? "bg-white shadow border text-amber-700" : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              🎯 Rencana Tabungan
+            </button>
+          </div>
+        </div>
+
+        {/* body */}
+        <div className="px-6 pb-6 mt-4">
+          {mode === "plan" && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <Input
+                label="Apa impianmu?"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="Contoh: Umrah, Rumah, Liburan Keluarga"
+              />
+              <FormattedCurrencyInput
+                label="Target Tabungan (Rp)"
+                value={goalAmount}
+                onChange={setGoalAmount}
+                placeholder="Contoh: 5.000.000"
+              />
+            </div>
+          )}
+
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <div className="text-xs text-gray-500">
+              {mode === "plan"
+                ? "Tips: Pilih target realistis, isi tujuan & nominalnya."
+                : "Tips: Cocok saat butuh dorongan singkat setiap hari."}
+            </div>
+            <Button
+              onClick={runGenerate}
+              disabled={loading || (mode === "plan" && (!goal || !goalAmount))}
+              className="bg-amber-500 hover:bg-amber-600"
+            >
+              {loading ? (<><SpinnerIcon /> Memproses...</>) : (<>Jalankan</>)}
             </Button>
           </div>
-          {savingsPlan && (
-            <div className="mt-4 p-4 bg-green-50 border-l-4 border-green-500 text-green-800 rounded-r-lg whitespace-pre-wrap">
-              {savingsPlan}
-            </div>
-          )}
-        </div>
 
-        <div className="bg-white p-6 rounded-lg shadow-md flex flex-col items-center justify-center text-center">
-          <h3 className="text-xl font-semibold text-gray-700 mb-4">Butuh Inspirasi Harian?</h3>
-          <Button onClick={handleGenerateTip} disabled={isGeneratingTip} className="bg-yellow-400 hover:bg-yellow-500 text-yellow-900">
-            <SparklesIcon /> {isGeneratingTip ? "Sedang berpikir..." : "Beri Saya Tips Menabung"}
-          </Button>
-          {savingsTip && (
-            <div className="mt-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded-r-lg">
-              <p className="text-sm italic">"{savingsTip}"</p>
+          {/* hasil gabungan */}
+          {result && (
+            <div
+              className={`mt-5 border rounded-xl ${
+                mode === "plan"
+                  ? "border-green-200 bg-green-50"
+                  : "border-yellow-200 bg-yellow-50"
+              }`}
+            >
+              <MarkdownBlock
+                text={result}
+                className={mode === "plan" ? "text-green-900" : "text-yellow-900"}
+              />
             </div>
           )}
         </div>
       </div>
 
-    {/* Contact Admin Section */}
-    <div className="bg-white p-6 rounded-lg shadow-md">
-      <div className="flex items-center gap-3 mb-2">
-        <WhatsAppIcon />
-        <h3 className="text-xl font-semibold text-gray-700">Hubungi Bendahara</h3>
-      </div>
-      <p className="text-gray-600 mb-4 text-sm">
-        Untuk setoran via transfer, konfirmasi data, atau pertanyaan lainnya, hubungi Bendahara lewat WhatsApp di bawah.
-      </p>
-
-      {(() => {
-        const superadmin = users.find(u => u.role === "superuser" && u.is_active);
-        const phoneRaw = superadmin?.phone?.replace(/\D/g, "") || "";
-        const phoneIntl = phoneRaw
-          ? (phoneRaw.startsWith("62") ? phoneRaw : phoneRaw.startsWith("0") ? "62" + phoneRaw.slice(1) : "62" + phoneRaw)
-          : "";
-        const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar KotakSenyum DWP :)`);
-
-        const waUrl = phoneIntl ? `https://wa.me/${phoneIntl}?text=${message}` : null;
-
-        return (
-          <div className="flex flex-wrap items-center gap-4">
+      {/* Hubungi Bendahara (tetap) */}
+      <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+        <div className="flex items-center gap-3 mb-2">
+          <WhatsAppIcon />
+          <h3 className="text-lg font-semibold text-gray-800">Hubungi Bendahara</h3>
+        </div>
+        <p className="text-gray-600 mb-4 text-sm">
+          Untuk setoran via transfer, konfirmasi data, atau pertanyaan lainnya, hubungi Bendahara lewat WhatsApp di bawah.
+        </p>
+        {(() => {
+          const sa = users.find(u => u.role === "superuser" && u.is_active);
+          const phoneRaw = sa?.phone?.replace(/\D/g, "") || "";
+          const phoneIntl = phoneRaw
+            ? (phoneRaw.startsWith("62") ? phoneRaw : phoneRaw.startsWith("0") ? "62" + phoneRaw.slice(1) : "62" + phoneRaw)
+            : "";
+          const message = encodeURIComponent(`Halo Bendahara, saya ${user.name}. Mau bertanya seputar KotakSenyum DWP :)`);
+          const waUrl = phoneIntl ? `https://wa.me/${phoneIntl}?text=${message}` : null;
+          return (
             <a href={waUrl || "#"} target="_blank" rel="noopener noreferrer">
               <Button
-                className={`bg-green-500 hover:bg-green-600 text-white ${!waUrl ? "opacity-50 cursor-not-allowed" : ""}`}
+                className={`bg-green-600 hover:bg-green-700 ${!waUrl ? "opacity-50 cursor-not-allowed" : ""}`}
                 disabled={!waUrl}
               >
                 <WhatsAppIcon /> Hubungi via WhatsApp
               </Button>
             </a>
+          );
+        })()}
+      </div>
 
-          </div>
-        );
-      })()}
-    </div>
-
-      <div className="bg-white p-6 rounded-lg shadow-md">
-        <h3 className="text-xl font-semibold text-gray-700 mb-4">Grafik Progres Tabungan</h3>
+      {/* Grafik (tetap) */}
+      <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
+        <h3 className="text-lg font-semibold text-gray-800 mb-4">Grafik Progres Tabungan</h3>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={chartData}>
             <CartesianGrid strokeDasharray="3 3" />
-            <XAxis
-              dataKey="date"
-              tickFormatter={(iso) =>
-                new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })
-              }
-            />
-            <YAxis tickFormatter={(v) => `Rp${v / 1000}k`} width={80} />
+            <XAxis dataKey="date" tickFormatter={(iso) => new Date(iso).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}/>
+            <YAxis tickFormatter={(v) => `Rp${v/1000}k`} width={80} />
             <Tooltip
               formatter={(v) => formatCurrency(v)}
-              labelFormatter={(iso) =>
-                new Date(iso).toLocaleDateString("id-ID", {
-                  weekday: "long", day: "2-digit", month: "long", year: "numeric"
-                })
-              }
+              labelFormatter={(iso) => new Date(iso).toLocaleDateString("id-ID", { weekday: "long", day: "2-digit", month: "long", year: "numeric" })}
             />
             <Legend />
             <Line type="monotone" dataKey="balance" name="Saldo" stroke="#f59e0b" strokeWidth={2} activeDot={{ r: 8 }} />
@@ -469,21 +577,18 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white p-6 rounded-lg shadow-md">
+      {/* Tabel transaksi (tetap) */}
+      <div className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
-          <h3 className="text-xl font-semibold text-gray-700">Riwayat Transaksi</h3>
+          <h3 className="text-lg font-semibold text-gray-800">Riwayat Transaksi</h3>
           <Button onClick={handleExport} className="bg-blue-600 hover:bg-blue-700 text-sm py-1.5 px-3">
             <DownloadIcon /> Ekspor CSV
           </Button>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left text-gray-500">
+          <table className="w-full text-sm text-left text-gray-600">
             <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-              <tr>
-                <th className="px-6 py-3">Tanggal</th>
-                <th className="px-6 py-3">Jumlah</th>
-                <th className="px-6 py-3 hidden sm:table-cell">Catatan</th>
-              </tr>
+              <tr><th className="px-6 py-3">Tanggal</th><th className="px-6 py-3">Jumlah</th><th className="px-6 py-3 hidden sm:table-cell">Catatan</th></tr>
             </thead>
             <tbody>
               {pagedUserTransactions.map((t) => (
@@ -496,7 +601,6 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
                   <td className="px-6 py-4 hidden sm:table-cell">{t.note || "-"}</td>
                 </tr>
               ))}
-
               {Array.from({ length: Math.max(0, PAGE_SIZE - pagedUserTransactions.length) }).map((_, i) => (
                 <tr key={`placeholder-${i}`} className="bg-transparent" aria-hidden="true">
                   <td className="px-6 py-4">&nbsp;</td>
@@ -529,6 +633,8 @@ const UserDashboard = ({ user, users, transactions, onExport, onGenerateTip, onG
   );
 };
 
+
+
 /* ===========================
    SUPERUSER DASHBOARD (ringkas)
 =========================== */
@@ -548,6 +654,12 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
   }, [users, transactions]);
   const activeUsers = useMemo(() => users.filter(u => u.is_active && u.role === "user").length, [users]);
 
+  // // Ringkas data bulanan jadi string untuk prompt AI
+  // const dataString = useMemo(
+  //   () => monthlyDeposits.map(d => `${d.name}: ${formatCurrency(d.total)}`).join(", "),
+  //   [monthlyDeposits]
+  // );
+
   const monthlyDeposits = useMemo(() => {
     const buckets = new Map();
     transactions.forEach((t) => {
@@ -566,6 +678,13 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
       });
   }, [transactions]);
 
+      // Ringkas data bulanan jadi string untuk prompt AI
+    const dataString = useMemo(
+      () => monthlyDeposits.map(d => `${d.name}: ${formatCurrency(d.total)}`).join(", "),
+      [monthlyDeposits]
+    );
+
+
   const recentTransactions = useMemo(
     () => [...transactions].sort((a,b) => new Date(b.created_at) - new Date(a.created_at))
       .slice(0,5)
@@ -573,30 +692,84 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
     [transactions, users]
   );
 
-  const handleGenerateSummary = async () => {
-    setIsGeneratingSummary(true);
-    const dataString = monthlyDeposits.map(d => `${d.name}: ${formatCurrency(d.total)}`).join(", ");
-    const text = await onGenerateSummary(
-      `Ringkas kondisi keuangan. Total dana ${formatCurrency(totalKas)}. Bulanan: ${dataString}. 2-3 kalimat, positif.`
-    );
-    setFinancialSummary(text || "");
-    setIsGeneratingSummary(false);
-  };
+const handleGenerateSummary = async () => {
+  setIsGeneratingSummary(true);
 
-  const handleGenerateAnnouncement = async () => {
-    setIsGeneratingAnnouncement(true);
-    const text = await onGenerateAnnouncement(
-      `Buat pengumuman singkat (maksimal 2 kalimat) untuk WhatsApp grup DWP UPT PPD Tulungagung.
-       Isi pengumuman: total saldo KotakSenyum DWP ${formatCurrency(totalKas)}, jumlah anggota aktif ${activeUsers}.
-       Tulis dengan langsung mengajak semangat menabung.`
-    );
-    setAnnouncement(text || "");
+  const fallback = () =>
+    `Saldo tabungan DWP telah mencapai ${formatCurrency(totalKas)}. ` +
+    `Tren tabungan bulanan menunjukkan progres positif; mari pertahankan ritme agar target bersama tercapai.`;
+
+  try {
+    const prompt =
+      `Buat ringkasan kondisi tabungan DWP. ` +
+      `Total saldo: ${formatCurrency(totalKas)}. ` +
+      `Data bulanan: ${dataString}. ` +
+      `Tulis 2–3 kalimat dengan nada positif dan semangat menabung.`;
+
+    const res = await api.post("/ai/generate", {
+      kind: "summary",
+      prompt,
+      totalKas: formatCurrency(totalKas),
+      dataString
+    });
+
+    const j = res.data || {};
+    const text = cleanAi(j.text || "");
+    setFinancialSummary(text || fallback());
+    if (j.ok === false) {
+      console.warn("AI fallback summary dipakai:", j.reason || "");
+    }
+  } catch (err) {
+    console.error("Gagal generate summary:", err);
+    setFinancialSummary(fallback());
+  } finally {
+    setIsGeneratingSummary(false);
+  }
+};
+
+
+const handleGenerateAnnouncement = async () => {
+  setIsGeneratingAnnouncement(true);
+
+  // fallback lokal kalau AI error/limit
+  const fallback = () =>
+    `Saldo KotakSenyum DWP saat ini ${formatCurrency(totalKas)} dengan ${activeUsers} anggota aktif. ` +
+    `Yuk lanjutkan semangat menabung agar target bersama makin cepat tercapai!`;
+
+  try {
+    const prompt =
+      `Buat pengumuman singkat (maks. 2 kalimat) untuk WhatsApp grup DWP UPT PPD Tulungagung. ` +
+      `Isi: total saldo KotakSenyum DWP ${formatCurrency(totalKas)} dan jumlah anggota aktif ${activeUsers}. ` +
+      `Tulis dengan nada positif dan ajakan langsung untuk menabung.`;
+
+    const res = await api.post("/ai/generate", {
+      kind: "announcement",
+      prompt,
+      totalKas: formatCurrency(totalKas),
+      activeUsers
+    });
+
+    const j = res.data || {};
+    const text = cleanAi(j.text || "");
+    // kalau backend balikin ok:false ATAU text kosong → pakai fallback
+    setAnnouncement(text || fallback());
+    if (j.ok === false) {
+      console.warn("AI fallback announcement dipakai:", j.reason || "");
+    }
+  } catch (err) {
+    console.error("Gagal generate pengumuman:", err);
+    // jangan alert — tampilkan draf aman agar UX tetap mulus
+    setAnnouncement(fallback());
+  } finally {
     setIsGeneratingAnnouncement(false);
-  };
+  }
+};
+
+
+
 
   return (
     <div className="space-y-6">
-      <h2 className="text-3xl font-bold text-gray-800">Dashboard Bendahara</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <Card title="Total Saldo Kas" value={formatCurrency(totalKas)} icon={<DollarSignIcon />} />
         <Card title="Total Tabungan Nasabah" value={formatCurrency(totalLiability)} icon={<BookOpenIcon />} subtext="Total liability" />
@@ -611,7 +784,10 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
               <SparklesIcon /> {isGeneratingSummary ? "Menganalisis..." : "Buat Ringkasan Keuangan"}
             </Button>
             {financialSummary && (
-              <div className="mt-4 p-4 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800 rounded-r-lg whitespace-pre-wrap">{financialSummary}</div>
+              <MarkdownBlock
+                text={financialSummary}
+                className="mt-4 bg-indigo-50 border-l-4 border-indigo-500 text-indigo-800"
+              />
             )}
           </div>
           <div>
@@ -619,9 +795,10 @@ const SuperuserDashboard = ({ users, transactions, onGenerateSummary, onGenerate
               <SparklesIcon /> {isGeneratingAnnouncement ? "Menyusun Kata..." : "Buat Draf Pengumuman"}
             </Button>
             {announcement && (
-              <div className="mt-4 p-4 bg-teal-50 border-l-4 border-teal-500 text-teal-800 rounded-r-lg">
-                <textarea readOnly value={announcement} className="w-full h-32 p-2 bg-transparent border-0 focus:ring-0 text-sm" />
-              </div>
+              <MarkdownBlock
+                text={announcement}
+                className="mt-4 bg-teal-50 border-l-4 border-teal-500 text-teal-800"
+              />
             )}
           </div>
         </div>
@@ -1338,13 +1515,21 @@ const handleLogin = async (identifier, password) => {
   const updateUser = async (user) => { await api.put(`/users/${user.id}`, user); await fetchAll(); };
   const createUser = async (user) => { await api.post("/users", user); await fetchAll(); };
 
-  // AI via backend proxy
-  const aiGenerate = async (prompt, systemInstruction="") => {
-    try {
-      const r = await api.post("/ai/generate", { prompt, systemInstruction });
-      return r.data?.text || "";
-    } catch { return ""; }
-  };
+// AI via backend proxy
+const aiGenerate = async (prompt, systemInstruction = "", kind) => {
+  try {
+    const r = await api.post("/ai/generate", { prompt, systemInstruction, kind });
+    const j = r.data || {};
+    if (j.text) return j.text;           // sukses atau fallback tetap punya text
+    return "Maaf, AI sedang sibuk. Coba lagi sebentar lagi.";
+  } catch (e) {
+    console.error("AI error:", e?.response?.data || e.message);
+    return "Maaf, AI sedang sibuk. Coba lagi sebentar lagi.";  // jangan return "" supaya tidak blank
+  }
+};
+
+
+
 
   const exportCSV = (headers, rows, filename) => {
     const csv = [headers.join(","), ...rows.map(row => headers.map(h => JSON.stringify(row[h.toLowerCase().replace(/ /g,"_")], "")).join(","))].join("\n");
@@ -1456,14 +1641,21 @@ const handleLogin = async (identifier, password) => {
   }
 
 
-  return (
-    <div className="bg-gray-100 min-h-screen font-sans">
-      <nav className="bg-white shadow-md">
+return (
+  <div className="relative min-h-screen font-sans bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50 overflow-hidden">
+
+    {/* dekorasi global halaman */}
+    <div className="pointer-events-none absolute -top-24 -left-24 w-[340px] h-[340px] bg-orange-200/50 rounded-full blur-3xl" />
+    <div className="pointer-events-none absolute -bottom-28 -right-24 w-[380px] h-[380px] bg-rose-200/50 rounded-full blur-3xl" />
+    <div className="pointer-events-none absolute top-24 right-20 w-[180px] h-[180px] bg-amber-100/60 rounded-full blur-2xl" />
+
+    <nav className="bg-white/90 backdrop-blur-md shadow-md relative z-10">
+
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 md:h-20">
             <div className="flex items-center space-x-3">
               <LogoIcon />
-              <span className="text-xl font-bold text-gray-800">KotakSenyum DWP</span>
+              <span className="text-xl font-bold text-gray-800 font-display">KotakSenyum DWP</span>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
               <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
