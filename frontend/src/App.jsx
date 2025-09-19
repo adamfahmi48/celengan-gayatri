@@ -18,7 +18,11 @@ const STORAGE_PAGE = "kotaksenyum_page";
 /* ===========================
    API CLIENT
 =========================== */
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8080";
+const API_BASE =
+  import.meta.env.VITE_API_BASE
+  || (typeof window !== "undefined" && window.location.hostname.endsWith(".vercel.app")
+        ? "/api"
+        : "http://localhost:8080");
 const api = axios.create({
   baseURL: API_BASE,
   timeout: 15000,
