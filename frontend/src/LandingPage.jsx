@@ -142,7 +142,7 @@ export default function LandingPage({ onGetStarted }) {
             <div className="text-center">
             {/* Ganti src dengan foto kamu */}
             <img
-            src="https://ketik.com/assets/upload/20240403212455bapenda0.webp"
+            src="/foto ibu dwp.JPG"
             alt="Kegiatan DWP"
             className="rounded-lg shadow-xl mx-auto w-full h-auto object-cover aspect-video"
             />
