@@ -239,58 +239,75 @@ const LoginPage = ({ onLogin, onBack }) => {
     }
   };
 
-  return (
-    <div className="relative min-h-screen flex flex-col justify-center items-center p-4 font-sans bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50 overflow-hidden">
-          {/* lingkaran dekorasi */}
+return (
+  <div className="relative min-h-screen flex flex-col justify-center items-center p-4 font-sans overflow-hidden">
+    {/* ===== Background gradient ===== */}
+    <div
+      className="absolute inset-0 bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50"
+      aria-hidden="true"
+    />
+    {/* ===== Lingkaran dekorasi ===== */}
     <div className="pointer-events-none absolute -top-24 -left-24 w-[340px] h-[340px] bg-orange-200/50 rounded-full blur-3xl" />
     <div className="pointer-events-none absolute -bottom-28 -right-24 w-[380px] h-[380px] bg-rose-200/50 rounded-full blur-3xl" />
     <div className="pointer-events-none absolute top-24 right-20 w-[180px] h-[180px] bg-amber-100/60 rounded-full blur-2xl" />
-      <div className="w-full max-w-md">
-        <div className="flex justify-center items-center mb-6 space-x-3">
-          <LogoIcon />
-          <h1 className="text-3xl font-bold text-gray-800">KotakSenyum DWP</h1>
-        </div>
 
-        <div className="relative z-10 bg-white/90 backdrop-blur-md p-8 rounded-xl shadow-lg">
-          {/* <h2 className="text-2xl font-bold text-center text-gray-700 mb-6">Login</h2> */}
+    {/* ===== Konten di atas ===== */}
+    <div className="relative z-10 w-full max-w-md">
+      <div className="flex justify-center items-center mb-6 space-x-3">
+        <LogoIcon />
+        <h1 className="text-3xl font-bold text-gray-800">KotakSenyum DWP</h1>
+      </div>
 
-          {error && <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>}
+      <div className="bg-white/90 backdrop-blur-md p-8 rounded-xl shadow-lg">
+        {error && (
+          <p className="bg-red-100 text-red-700 p-3 rounded-md mb-4 text-sm">{error}</p>
+        )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <Input
-              label="Email / Username / No. HP"
-              type="text"
-              value={identifier}
-              onChange={(e) => setIdentifier(e.target.value)}
-              placeholder="Email / Username / No. HP"
-              required
-            />
-            <Input
-              label="Password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              required
-            />
-            <Button
-              type="submit"
-              className="w-full bg-amber-500 hover:bg-amber-600"
-              disabled={isLoading}
-            >
-              {isLoading ? (<><SpinnerIcon /><span>Memproses...</span></>) : "Login"}
-            </Button>
-          </form>
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <Input
+            label="Email / Username / No. HP"
+            type="text"
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            placeholder="Email / Username / No. HP"
+            required
+          />
+          <Input
+            label="Password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            required
+          />
+          <Button
+            type="submit"
+            className="w-full bg-amber-500 hover:bg-amber-600"
+            disabled={isLoading}
+          >
+            {isLoading ? (
+              <>
+                <SpinnerIcon />
+                <span>Memproses...</span>
+              </>
+            ) : (
+              "Login"
+            )}
+          </Button>
+        </form>
 
-          <p className="text-center text-sm text-gray-500 mt-4">
-            <button onClick={onBack} className="hover:text-orange-500 hover:underline transition-colors duration-200">
-              « Kembali ke Beranda
-            </button>
-          </p>
-        </div>
+        <p className="text-center text-sm text-gray-500 mt-4">
+          <button
+            onClick={onBack}
+            className="hover:text-orange-500 hover:underline transition-colors duration-200"
+          >
+            « Kembali ke Beranda
+          </button>
+        </p>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 
