@@ -1665,62 +1665,76 @@ const aiGenerate = async (prompt, systemInstruction = "", kind) => {
 
 return (
   <div className="relative min-h-screen font-sans bg-gradient-to-br from-amber-50 via-rose-50 to-sky-50 overflow-hidden">
+    {/* Dekorasi latar di belakang semua konten */}
+    <div className="pointer-events-none absolute inset-0 z-0" aria-hidden="true">
+      <div className="absolute -top-24 -left-24 w-[340px] h-[340px] bg-orange-200/50 rounded-full blur-3xl" />
+      <div className="absolute -bottom-28 -right-24 w-[380px] h-[380px] bg-rose-200/50 rounded-full blur-3xl" />
+      <div className="absolute top-24 right-20 w-[180px] h-[180px] bg-amber-100/60 rounded-full blur-2xl" />
+    </div>
 
-    {/* dekorasi global halaman */}
-    <div className="pointer-events-none absolute -top-24 -left-24 w-[340px] h-[340px] bg-orange-200/50 rounded-full blur-3xl" />
-    <div className="pointer-events-none absolute -bottom-28 -right-24 w-[380px] h-[380px] bg-rose-200/50 rounded-full blur-3xl" />
-    <div className="pointer-events-none absolute top-24 right-20 w-[180px] h-[180px] bg-amber-100/60 rounded-full blur-2xl" />
+    {/* NAVBAR di atas dekorasi */}
+    <nav className="relative z-20 bg-white/90 backdrop-blur-md shadow-md">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 md:h-20">
+          <div className="flex items-center space-x-3">
+            <LogoIcon />
+            <span className="text-xl font-bold text-gray-800 font-display">KotakSenyum DWP</span>
+          </div>
 
-    <nav className="bg-white/90 backdrop-blur-md shadow-md relative z-10">
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-4 md:h-20">
-            <div className="flex items-center space-x-3">
-              <LogoIcon />
-              <span className="text-xl font-bold text-gray-800 font-display">KotakSenyum DWP</span>
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
+            <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
+              {currentUser.role === "superuser" ? (
+                <>
+                  <button onClick={() => setPage("superuserDashboard")} className="nav-link">Dashboard</button>
+                  <button onClick={() => setPage("transactionEntry")} className="nav-link">Entry Transaksi</button>
+                  <button onClick={() => setPage("userManagement")} className="nav-link">Manajemen User</button>
+                  <button onClick={() => setPage("ledger")} className="nav-link">Buku Besar</button>
+                </>
+              ) : (
+                <button onClick={() => setPage("userDashboard")} className="nav-link">Dashboard</button>
+              )}
             </div>
-            <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 w-full sm:w-auto">
-              <div className="flex flex-wrap justify-center gap-2 sm:gap-4">
-                {currentUser.role === "superuser" ? (
-                  <>
-                    <button onClick={() => setPage("superuserDashboard")} className="nav-link">Dashboard</button>
-                    <button onClick={() => setPage("transactionEntry")} className="nav-link">Entry Transaksi</button>
-                    <button onClick={() => setPage("userManagement")} className="nav-link">Manajemen User</button>
-                    <button onClick={() => setPage("ledger")} className="nav-link">Buku Besar</button>
-                  </>
-                ) : (
-                  <button onClick={() => setPage("userDashboard")} className="nav-link">Dashboard</button>
-                )}
-              </div>
-              <hr className="w-full border-gray-200 sm:hidden" />
-              <div className="flex items-center gap-3 pt-2 sm:pt-0">
-                <span className="text-sm text-gray-700">Halo, <span className="font-semibold">{currentUser.name}</span></span>
-                <button onClick={handleLogout} className="text-sm font-medium text-red-600 hover:text-red-500">Logout</button>
-              </div>
+
+            <hr className="w-full border-gray-200 sm:hidden" />
+
+            <div className="flex items-center gap-3 pt-2 sm:pt-0">
+              <span className="text-sm text-gray-700">
+                Halo, <span className="font-semibold">{currentUser.name}</span>
+              </span>
+              <button
+                onClick={handleLogout}
+                className="text-sm font-medium text-red-600 hover:text-red-500"
+              >
+                Logout
+              </button>
             </div>
           </div>
         </div>
-      </nav>
+      </div>
+    </nav>
 
-      {loading && (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
-          <div className="text-sm text-gray-500">Memuat data…</div>
-        </div>
-      )}
+    {loading && (
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2">
+        <div className="text-sm text-gray-500">Memuat data…</div>
+      </div>
+    )}
 
-      <main className="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">{renderPage()}</main>
+    {/* Konten utama di atas dekorasi */}
+    <main className="relative z-10 max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+      {renderPage()}
+    </main>
 
-      <style>{`
-        .nav-link {
-          padding: 0.5rem 0.75rem;
-          border-radius: 0.375rem;
-          font-weight: 500;
-          color: #4b5563;
-          transition: background-color 0.2s, color 0.2s;
-          white-space: nowrap;
-        }
-        .nav-link:hover { background-color: #fef3c7; color: #b45309; }
-      `}</style>
-    </div>
-  );
+    <style>{`
+      .nav-link {
+        padding: 0.5rem 0.75rem;
+        border-radius: 0.375rem;
+        font-weight: 500;
+        color: #4b5563;
+        transition: background-color 0.2s, color 0.2s;
+        white-space: nowrap;
+      }
+      .nav-link:hover { background-color: #fef3c7; color: #b45309; }
+    `}</style>
+  </div>
+);
 }
